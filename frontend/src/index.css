@@ -18,3 +18,32 @@ body {
   outline: 2px solid #2563eb; /* blue-600 */
   outline-offset: 2px;
 }
+
+/* ── Impression du ticket — rouleau thermique 80 mm ────────────── */
+@page {
+  size: 80mm auto;
+  margin: 4mm;
+}
+
+@media print {
+  /* N'imprime QUE le ticket, quel que soit l'endroit du DOM */
+  body * {
+    visibility: hidden !important;
+  }
+  .ticket-print,
+  .ticket-print * {
+    visibility: visible !important;
+  }
+  .ticket-print {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 72mm;
+    background: #fff;
+    color: #000;
+    font-size: 12px;
+  }
+  .ticket-print hr {
+    border-color: #999;
+  }
+}

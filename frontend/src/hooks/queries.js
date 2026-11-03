@@ -10,6 +10,30 @@ import { getRapportJour } from '../api/rapports.js'
 
 // ── Queries ─────────────────────────────────────────────────────
 
+/** Récupère TOUTES les pages produits (grille de caisse sans coupure). */
+async function fetchAllProduits(params) {
+  const first = await listProduits({ ...params, page: 1 })
+  let results = first.results
+  let next = first.next
+  let page = 1
+  while (next && page < 20) {
+    page += 1
+    const p = await listProduits({ ...params, page })
+    results = results.concat(p.results)
+    next = p.next
+  }
+  return { ...first, results }
+}
+
+/** Grille produits de la caisse (toutes pages confondues). */
+export function useProduitsGrille(params) {
+  return useQuery({
+    queryKey: ['produits', 'grille', params],
+    queryFn: () => fetchAllProduits(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
 /** @returns {import('@tanstack/react-query').UseQueryResult<import('../api/types.js').Page<import('../api/types.js').Categorie>>} */
 export function useCategories() {
   return useQuery({ queryKey: ['categories'], queryFn: listCategories })
