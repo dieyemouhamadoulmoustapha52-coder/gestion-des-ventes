@@ -1,0 +1,98 @@
+# ============================================================
+#  .gitignore racine — Monorepo Gestion des Ventes (MVP)
+#  Backend Django/Python · Frontend React/Node · Outillage
+# ============================================================
+
+# ---------- Python / Django (backend/) ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+!.env.example
+*.egg-info/
+.eggs/
+eggs/
+build/
+dist/
+sdist/
+pip-wheel-metadata/
+
+# Fichiers générés par Django
+*.log
+logs/
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+static/
+media/
+.htmlcov/
+.coverage
+.coverage.*
+htmlcov/
+
+# Outils qualité / tests Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# ---------- Node / React (frontend/) ----------
+node_modules/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+dist/
+build/
+.vite/
+.cache/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# ---------- Environnements & secrets ----------
+# (les .env sont ignorés globalement plus haut, seuls les modèles sont versionnés)
+*.pem
+*.key
+secrets/
+secrets.json
+
+# ---------- IDE / Éditeurs ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+.nb-projects/
+*.sublime-project
+*.sublime-workspace
+
+# ---------- Système ----------
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.directory
+
+# ---------- Divers ----------
+tmp/
+.tmp/
+*.pid
+*.seed
+*.pid.lock
+.cache/

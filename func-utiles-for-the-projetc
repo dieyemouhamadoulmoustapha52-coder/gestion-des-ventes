@@ -1,0 +1,7 @@
+    // Cumul de la quantité vendue par produit (pour le top 3 de la partie 3)
+    $qteVendueParProduit[$code] = ($qteVendueParProduit[$code] ?? 0) + $qteDemandee;
+    pour connaitre les produits les mieux acheter
+
+        // Cumul du chiffre d'affaires HT par catégorie
+    $categorie = $catalogue[$code]["categorie"];
+    $caParCategorie[$categorie] = ($caParCategorie[$categorie] ?? 0) + $montantHT;

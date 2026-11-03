@@ -1,0 +1,17 @@
+# ============================================================
+#  Backend — API Django + Django REST Framework (Python)
+#  Installation : pip install -r requirements.txt
+# ============================================================
+
+# ---------- API web ----------
+Django>=5.1,<6.0
+djangorestframework>=3.15
+
+# ---------- Configuration via fichier .env ----------
+django-environ>=0.12
+
+# ---------- Connecteur MySQL 8 ----------
+mysqlclient>=2.2
+
+# ---------- Serveur WSGI (production) ----------
+gunicorn>=22.0
