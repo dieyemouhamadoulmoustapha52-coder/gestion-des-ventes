@@ -150,7 +150,7 @@ git push -u origin main
 
 ```bash
 # En ligne de commande (droits de push) :
-gh api -X POST repos/<VOTRE_USER>/<NOM_DU_DEPOT>/collaborators/<USER_DU_COLLABORATEUR> -f permission=push
+gh api -X PUT repos/<VOTRE_USER>/<NOM_DU_DEPOT>/collaborators/<USER_DU_COLLABORATEUR> -f permission=push
 ```
 
 _Ou sur GitHub :_ `Settings` → `Collaborators and teams` → `Add people`.
