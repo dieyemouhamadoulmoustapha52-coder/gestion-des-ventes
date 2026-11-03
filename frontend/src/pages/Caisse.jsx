@@ -16,7 +16,7 @@ import { useToast } from '../components/Toast.jsx'
 import { isStockError } from '../api/client.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille } from '../hooks/queries.js'
-import { MODES_CAISSE, MODE_LABELS, STOCK_BAS_SEUIL } from '../lib/constants.js'
+import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
 import { formatFcfa } from '../lib/money.js'
 import { useDebounce } from '../lib/useDebounce.js'
 
@@ -206,7 +206,7 @@ export default function Caisse() {
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {list.map((p) => {
-                const rupture = p.stock <= 0
+                const rupture = p.stock === 0
                 return (
                   <button
                     key={p.id}
@@ -224,7 +224,7 @@ export default function Caisse() {
                       <span className="font-mono text-[11px] text-slate-400">{p.code}</span>
                       {rupture ? (
                         <Badge tone="red">Rupture</Badge>
-                      ) : p.stock <= STOCK_BAS_SEUIL ? (
+                      ) : p.est_en_alerte ? (
                         <Badge tone="orange">{p.stock} restant{p.stock > 1 ? 's' : ''}</Badge>
                       ) : (
                         <span className="text-[11px] text-slate-400">{p.stock} en stock</span>

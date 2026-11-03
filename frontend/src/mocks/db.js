@@ -31,16 +31,21 @@ export const state = {
     { id: 2, nom: 'Boissons', description: 'Eaux, jus et rafraîchissements' },
     { id: 3, nom: 'Hygiène', description: 'Entretien et hygiène corporelle' },
   ],
-  /** prix en FCFA entiers ; seuils_alerte choisis pour couvrir alerte + rupture */
+  /**
+   * prix en FCFA entiers ; `seuil` DISTINCT par produit — l'état d'alerte
+   * (stock <= seuil) varie donc d'un produit à l'autre et pilote le badge
+   * « Stock bas » via `est_en_alerte` : HUILE5 et BISSAP en alerte,
+   * JAVEL en rupture (stock 0), les autres au-dessus de leur seuil.
+   */
   produits: [
-    { id: 1, code: 'RIZ25', nom: 'Riz parfumé 25 kg', categorie: 1, prix: 15500, stock: 8, seuil: 4 },
-    { id: 2, code: 'HUILE5', nom: 'Huile 5 L', categorie: 1, prix: 6200, stock: 4, seuil: 5 },
-    { id: 3, code: 'SUCRE1', nom: 'Sucre 1 kg', categorie: 1, prix: 750, stock: 30, seuil: 10 },
-    { id: 4, code: 'LAIT400', nom: 'Lait en poudre 400 g', categorie: 1, prix: 2750, stock: 10, seuil: 5 },
-    { id: 5, code: 'CAFE', nom: 'Café Touba 250 g', categorie: 1, prix: 1200, stock: 15, seuil: 6 },
-    { id: 6, code: 'BISSAP', nom: 'Jus de bissap 1 L', categorie: 2, prix: 1000, stock: 6, seuil: 4 },
-    { id: 7, code: 'EAU15', nom: 'Eau minérale 1,5 L', categorie: 2, prix: 350, stock: 40, seuil: 10 },
-    { id: 8, code: 'SAVON', nom: 'Savon de Marseille', categorie: 3, prix: 400, stock: 20, seuil: 5 },
+    { id: 1, code: 'RIZ25', nom: 'Riz parfumé 25 kg', categorie: 1, prix: 15500, stock: 8, seuil: 5 },
+    { id: 2, code: 'HUILE5', nom: 'Huile 5 L', categorie: 1, prix: 6200, stock: 4, seuil: 6 },
+    { id: 3, code: 'SUCRE1', nom: 'Sucre 1 kg', categorie: 1, prix: 750, stock: 30, seuil: 12 },
+    { id: 4, code: 'LAIT400', nom: 'Lait en poudre 400 g', categorie: 1, prix: 2750, stock: 10, seuil: 4 },
+    { id: 5, code: 'CAFE', nom: 'Café Touba 250 g', categorie: 1, prix: 1200, stock: 15, seuil: 7 },
+    { id: 6, code: 'BISSAP', nom: 'Jus de bissap 1 L', categorie: 2, prix: 1000, stock: 6, seuil: 8 },
+    { id: 7, code: 'EAU15', nom: 'Eau minérale 1,5 L', categorie: 2, prix: 350, stock: 40, seuil: 15 },
+    { id: 8, code: 'SAVON', nom: 'Savon de Marseille', categorie: 3, prix: 400, stock: 20, seuil: 9 },
     { id: 9, code: 'JAVEL', nom: 'Eau de Javel 1 L', categorie: 3, prix: 600, stock: 0, seuil: 3 },
   ],
   /** Historique fictif : ventes d'hier + d'aujourd'hui (pour historique & rapport) */

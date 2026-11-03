@@ -16,7 +16,6 @@ import ProduitModal from '../components/ProduitModal.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { useCategories, useDeleteProduit, useProduits } from '../hooks/queries.js'
-import { STOCK_BAS_SEUIL } from '../lib/constants.js'
 import { formatFcfa } from '../lib/money.js'
 import { useDebounce } from '../lib/useDebounce.js'
 
@@ -208,7 +207,7 @@ export default function Produits() {
                         <span className="font-semibold text-slate-900">{p.stock}</span>
                         {p.stock === 0 ? (
                           <Badge tone="red">Rupture</Badge>
-                        ) : p.stock <= STOCK_BAS_SEUIL ? (
+                        ) : p.est_en_alerte ? (
                           <Badge tone="orange">Stock bas</Badge>
                         ) : null}
                       </div>
