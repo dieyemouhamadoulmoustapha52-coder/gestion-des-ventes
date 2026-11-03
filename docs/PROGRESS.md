@@ -16,6 +16,8 @@
 - [x] README frontend + checklist d'intégration (JS initial ≈ 97 Ko gzip)
 - [x] Correction seuil : badge « Stock bas » aligné sur `est_en_alerte` (API) — constante ≤ 5 retirée ;
       `seuil_alerte` distinct par produit dans les mocks (HUILE5 et BISSAP en alerte, JAVEL en rupture)
+- [x] Correction Firefox : démarrage MSW entouré d'un try/catch dans `bootstrap()` (plus d'écran blanc
+      si les service workers sont bloqués) + bannière « Mode démo indisponible » + favicon SVG
 
 ## À faire
 

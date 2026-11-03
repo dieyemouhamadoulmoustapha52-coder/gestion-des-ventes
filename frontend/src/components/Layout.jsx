@@ -5,6 +5,7 @@
 import { Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { BarChart3, Package, Receipt, ShoppingCart } from 'lucide-react'
+import DemoBanner from './DemoBanner.jsx'
 import PageSkeleton from './PageSkeleton.jsx'
 
 const NAV = [
@@ -69,6 +70,7 @@ export default function Layout() {
       {/* Contenu */}
       <main className="lg:pl-64">
         <div className="mx-auto max-w-6xl px-4 py-6 pb-28 lg:pb-10">
+          <DemoBanner />
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />
           </Suspense>
