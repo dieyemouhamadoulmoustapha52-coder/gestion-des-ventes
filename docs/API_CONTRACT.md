@@ -58,3 +58,14 @@
 ```
 
 - Non trouvé **404** : `{"detail": "…"}` ; conflit PROTECT **409** : `{"detail": "…"}`.
+
+## Checklist d'intégration (avant de brancher le vrai backend)
+
+- [ ] **CORS** : origine du front (`http://localhost:5173`) autorisée — ou s'appuyer sur le proxy Vite `/api → :8000` (déjà configuré dans `frontend/vite.config.js`).
+- [ ] **Slash final** sur toutes les routes DRF (`/api/produits/`, jamais `/api/produits`).
+- [ ] **`page_size = 10`** configuré sur la pagination (le front suppose cette taille).
+- [ ] **DecimalField en chaînes** : `prix_unitaire`, `montant_total`, `ca_total`, `panier_moyen`, `total`, `ca` → `"15500.00"` (normalisés côté front par `src/lib/money.js`).
+- [ ] **Erreurs** : 400 = `{champ: ["message"]}` ; 409 `stock_insuffisant` = `{code, detail, produit, stock_disponible}` ; 404/PROTECT = `{detail}`.
+- [ ] **Dates** : `date_vente` en ISO 8601 ; filtres `?date=YYYY-MM-DD` sur `ventes/` et `rapports/jour/`.
+- [ ] **Enum modes** : `ESPECES | WAVE | ORANGE_MONEY | CARTE` (majuscules, sensibles à la casse).
+- [ ] **Authentification (plus tard)** : header ajouté uniquement dans `src/api/client.js` — aucun écran à modifier.
