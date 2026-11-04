@@ -6,7 +6,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { createCategory, deleteCategory, listCategories, updateCategory } from '../api/categories.js'
 import { createProduit, deleteProduit, listProduits, updateProduit } from '../api/produits.js'
 import { creerVente, getVente, listVentes } from '../api/ventes.js'
-import { getRapportJour } from '../api/rapports.js'
+import { getRapportJour, getTableauDeBord } from '../api/rapports.js'
+import { reapprovisionnerProduit } from '../api/produits.js'
 
 // ── Queries ─────────────────────────────────────────────────────
 
@@ -72,6 +73,20 @@ export function useVente(id) {
 /** Rapport du jour. @param {string} date 'YYYY-MM-DD' */
 export function useRapport(date) {
   return useQuery({ queryKey: ['rapport', date], queryFn: () => getRapportJour(date) })
+}
+
+/**
+ * Tableau de bord (page d'accueil) — UN SEUL appel, rafraîchi toutes les 60 s.
+ * @param {string} [date] 'YYYY-MM-DD' — défaut serveur : aujourd'hui (Africa/Dakar)
+ * @returns {import('@tanstack/react-query').UseQueryResult<import('../api/types.js').TableauDeBord>}
+ */
+export function useTableauDeBord(date) {
+  return useQuery({
+    queryKey: ['tableau-de-bord', date ?? 'aujourdhui'],
+    queryFn: () => getTableauDeBord(date),
+    refetchInterval: 60_000, // mise à jour automatique chaque minute
+    refetchWindowInBackground: false,
+  })
 }
 
 // ── Mutations ───────────────────────────────────────────────────

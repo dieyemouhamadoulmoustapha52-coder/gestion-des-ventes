@@ -49,3 +49,16 @@ export function updateProduit(id, data) {
 export function deleteProduit(id) {
   return request(`produits/${id}/`, { method: 'DELETE' })
 }
+
+/**
+ * Réapprovisionne un produit : stock += quantite (opération atomique).
+ * @param {number} id
+ * @param {number} quantite entier strictement > 0
+ * @returns {Promise<import('./types.js').Produit>} produit à jour
+ */
+export function reapprovisionnerProduit(id, quantite) {
+  return request(`produits/${id}/reapprovisionner/`, {
+    method: 'POST',
+    body: { quantite },
+  }).then(norm)
+}

@@ -5,6 +5,7 @@
  */
 import { http, HttpResponse, delay } from 'msw'
 import * as db from './db.js'
+import { dateDakar, decaleJours } from '../lib/dates.js'
 
 const wait = () => delay(200 + Math.random() * 200)
 const ok = async (body) => {
@@ -45,6 +46,13 @@ const fold = (s) =>
   String(s).toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '')
 
 const sortedByNom = (list) => [...list].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+
+/** Date AAAA-MM-JJ stricte (équivalent DateField DRF) : format + date réelle. */
+function parseDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const d = new Date(`${s}T00:00:00Z`)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
+}
 
 export const handlers = [
   // ── categories/ ─────────────────────────────────────────────
@@ -234,6 +242,24 @@ export const handlers = [
     return noContent()
   }),
 
+  // ── produits/{id}/reapprovisionner/ ────────────────────────
+  http.post('*/api/produits/:id/reapprovisionner/', async ({ params, request }) => {
+    const p = db.findProduit(params.id)
+    if (!p) return fail(404, { detail: 'Non trouvé.' })
+    const body = await request.json().catch(() => ({}))
+    const brut = body.quantite
+    const q = typeof brut === 'string' && brut.trim() !== ''
+      ? Number(brut)
+      : typeof brut === 'number'
+        ? brut
+        : NaN
+    if (!Number.isInteger(q) || q <= 0) {
+      return fail(400, { quantite: ['Entier strictement positif attendu.'] })
+    }
+    p.stock += q // opération atomique : une seule écriture
+    return ok(db.serializeProduit(p))
+  }),
+
   // ── ventes/ ─────────────────────────────────────────────────
   http.get('*/api/ventes/', ({ request }) => {
     const u = new URL(request.url)
@@ -315,7 +341,7 @@ export const handlers = [
   // ── rapports/jour/ ──────────────────────────────────────────
   http.get('*/api/rapports/jour/', ({ request }) => {
     const date = new URL(request.url).searchParams.get('date')
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) {
+    if (!parseDate(date)) {
       return fail(400, { date: ['Format attendu : AAAA-MM-JJ.'] })
     }
 
@@ -373,6 +399,78 @@ export const handlers = [
         .sort((a, b) => b.ca - a.ca),
       top_produits: [...parProd.values()].sort((a, b) => b.qte - a.qte).slice(0, 3),
       produits_a_racheter: alertes,
+    })
+  }),
+
+  // ── rapports/tableau-de-bord/ ─────────────────────────────
+  http.get('*/api/rapports/tableau-de-bord/', ({ request }) => {
+    const param = new URL(request.url).searchParams.get('date')
+    let date
+    if (param === null || param === '') date = dateDakar()
+    else if (!parseDate(param)) {
+      return fail(400, { date: ['Format attendu : AAAA-MM-JJ.'] })
+    } else date = param
+
+    const ventesJour = (d) => db.state.ventes.filter((v) => v.date_vente.slice(0, 10) === d)
+    const ca = (list) => list.reduce((s, v) => s + v.total, 0)
+
+    const vAuj = ventesJour(date)
+    const vHier = ventesJour(decaleJours(date, -1))
+
+    // Série de 7 jours glissants chronologiques finissant à `date`
+    const serie = []
+    const idsSemaine = new Set()
+    for (let i = 6; i >= 0; i--) {
+      const d = decaleJours(date, -i)
+      const list = ventesJour(d)
+      list.forEach((v) => idsSemaine.add(v.id))
+      serie.push({ date: d, ca: db.money(ca(list)), nb_ventes: list.length })
+    }
+
+    // Top produits sur la même fenêtre de 7 jours (max 5)
+    const parProd = new Map()
+    for (const l of db.state.lignes) {
+      if (!idsSemaine.has(l.vente)) continue
+      const p = db.findProduit(l.produit)
+      if (!p) continue
+      const e = parProd.get(p.id) || { produit: p.id, code: p.code, nom: p.nom, qte: 0 }
+      e.qte += l.quantite
+      parProd.set(p.id, e)
+    }
+    const top = [...parProd.values()].sort((a, b) => b.qte - a.qte).slice(0, 5)
+
+    // État instantané des stocks
+    const produits = db.state.produits
+    const stock = {
+      nb_produits: produits.length,
+      nb_en_alerte: produits.filter((p) => p.stock <= p.seuil).length,
+      nb_en_rupture: produits.filter((p) => p.stock === 0).length,
+      valeur_stock: db.money(produits.reduce((s, p) => s + p.prix * p.stock, 0)),
+    }
+
+    // 5 dernières ventes : globales, indépendantes du paramètre `date`
+    const dernieres = [...db.state.ventes]
+      .sort((a, b) => b.date_vente.localeCompare(a.date_vente))
+      .slice(0, 5)
+      .map((v) => ({
+        id: v.id,
+        date_vente: v.date_vente,
+        montant_total: db.money(v.total),
+        mode_paiement: v.mode_paiement,
+      }))
+
+    return ok({
+      date,
+      aujourdhui: {
+        ca: db.money(ca(vAuj)),
+        nb_ventes: vAuj.length,
+        panier_moyen: db.money(vAuj.length ? ca(vAuj) / vAuj.length : 0),
+      },
+      hier: { ca: db.money(ca(vHier)), nb_ventes: vHier.length },
+      serie_7_jours: serie,
+      top_produits_semaine: top,
+      stock,
+      dernieres_ventes: dernieres,
     })
   }),
 ]

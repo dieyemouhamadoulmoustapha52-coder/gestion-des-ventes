@@ -19,6 +19,16 @@
 - [x] Correction Firefox : démarrage MSW entouré d'un try/catch dans `bootstrap()` (plus d'écran blanc
       si les service workers sont bloqués) + bannière « Mode démo indisponible » + favicon SVG
 
+## Phase 2 — étapes 8 à 13 (frontend)
+
+- [ ] Étape 8 — contrat + mocks contract-first : `GET /api/rapports/tableau-de-bord/`,
+      `POST /api/produits/{id}/reapprovisionner/`, 30 jours de ventes simulées, suite de tests de contrat
+- [ ] Étape 9 — tableau de bord (page d'accueil `/`, 1 seul appel API, 60 s, après chaque vente)
+- [ ] Étape 10 — produits en mode gestion (validations, reapprovisionnement, suppression 409)
+- [ ] Étape 11 — socle de personnalisation (`src/config/boutique.js` + `BoutiqueContext`, variable CSS)
+- [ ] Étape 12 — thèmes clair / sombre doux / auto (variables CSS sémantiques, sans flash)
+- [ ] Étape 13 — optimisation mesurée (JS gzip, avant/après, unités insécables)
+
 ## À faire
 
 - [ ] Backend Django : projet + API conformes à `docs/API_CONTRACT.md` (voir checklist d'intégration)
