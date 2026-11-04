@@ -89,6 +89,18 @@ ehthumbs.db
 Desktop.ini
 .directory
 
+# ---------- Présentations / documents binaires ----------
+*.pptx
+*.ppt
+*.pdf
+*.odp
+*.key
+*.keynote
+*.ppsx
+*.pub
+*.potx
+*.vsdx
+
 # ---------- Divers ----------
 tmp/
 .tmp/
