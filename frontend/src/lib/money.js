@@ -22,5 +22,5 @@ export function toNumber(value) {
  * @returns {string}
  */
 export function formatFcfa(value) {
-  return `${NF.format(Math.round(toNumber(value)))} FCFA`
+  return `${NF.format(Math.round(toNumber(value)))}\u00A0FCFA`
 }

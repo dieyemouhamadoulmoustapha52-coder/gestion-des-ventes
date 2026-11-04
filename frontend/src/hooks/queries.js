@@ -103,6 +103,7 @@ export function useCreerVente() {
       qc.invalidateQueries({ queryKey: ['produits'] })
       qc.invalidateQueries({ queryKey: ['ventes'] })
       qc.invalidateQueries({ queryKey: ['rapport'] })
+      qc.invalidateQueries({ queryKey: ['tableau-de-bord'] })
     },
   })
 }
@@ -127,6 +128,20 @@ export function useDeleteProduit() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['produits'] })
       qc.invalidateQueries({ queryKey: ['rapport'] })
+      qc.invalidateQueries({ queryKey: ['tableau-de-bord'] })
+    },
+  })
+}
+
+/** @param {{id: number, quantite: number}} vars */
+export function useReapprovisionnerProduit() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, quantite }) => reapprovisionnerProduit(id, quantite),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['produits'] })
+      qc.invalidateQueries({ queryKey: ['rapport'] })
+      qc.invalidateQueries({ queryKey: ['tableau-de-bord'] })
     },
   })
 }

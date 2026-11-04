@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { applyTheme, getStoredTheme, THEME_KEY } from './config/theme.js'
 import { demoState } from './lib/demo.js'
 
 /**
@@ -15,21 +16,28 @@ import { demoState } from './lib/demo.js'
  * au lieu d'un écran blanc.
  */
 async function bootstrap() {
-  if (import.meta.env.VITE_USE_MOCK === 'true') {
-    try {
-      const { worker } = await import('./mocks/browser.js')
-      await worker.start({ onUnhandledRequest: 'bypass' })
-      demoState.actif = true
-    } catch (err) {
-      console.error('MSW — démarrage du mode démo impossible :', err)
-      demoState.indisponible = true
-    }
-  }
-  createRoot(document.getElementById('root')).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  )
+ const theme = getStoredTheme()
+ applyTheme(theme)
+ if (window.matchMedia('(prefers-color-scheme: dark)').matches && theme === 'auto') {
+   applyTheme('auto')
+ }
+
+ if (import.meta.env.VITE_USE_MOCK === 'true') {
+   try {
+     const { worker } = await import('./mocks/browser.js')
+     await worker.start({ onUnhandledRequest: 'bypass' })
+     demoState.actif = true
+   } catch (err) {
+     console.error('MSW — démarrage du mode démo impossible :', err)
+     demoState.indisponible = true
+   }
+ }
+
+ createRoot(document.getElementById('root')).render(
+   <StrictMode>
+     <App />
+   </StrictMode>,
+ )
 }
 
 bootstrap()

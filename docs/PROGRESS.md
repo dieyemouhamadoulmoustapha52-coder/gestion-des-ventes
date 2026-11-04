@@ -1,6 +1,6 @@
 # Progression du projet — Gestion des ventes
 
-> Dernière mise à jour : 03/11/2026 · branche `feature/frontend-ui`
+> Dernière mise à jour : 04/11/2026 · branche `feature/frontend-ui`
 
 ## Fait
 
@@ -21,13 +21,19 @@
 
 ## Phase 2 — étapes 8 à 13 (frontend)
 
-- [ ] Étape 8 — contrat + mocks contract-first : `GET /api/rapports/tableau-de-bord/`,
+- [x] Étape 8 — contrat + mocks contract-first : `GET /api/rapports/tableau-de-bord/`,
       `POST /api/produits/{id}/reapprovisionner/`, 30 jours de ventes simulées, suite de tests de contrat
-- [ ] Étape 9 — tableau de bord (page d'accueil `/`, 1 seul appel API, 60 s, après chaque vente)
-- [ ] Étape 10 — produits en mode gestion (validations, reapprovisionnement, suppression 409)
-- [ ] Étape 11 — socle de personnalisation (`src/config/boutique.js` + `BoutiqueContext`, variable CSS)
-- [ ] Étape 12 — thèmes clair / sombre doux / auto (variables CSS sémantiques, sans flash)
-- [ ] Étape 13 — optimisation mesurée (JS gzip, avant/après, unités insécables)
+- [x] Étape 9 — tableau de bord (page d'accueil `/`, 1 seul appel API, 60 s, après chaque vente)
+- [x] Étape 10 — produits en mode gestion (validations, reapprovisionnement, suppression 409)
+- [x] Étape 11 — socle de personnalisation (`src/config/boutique.js` + `BoutiqueContext`, variable CSS)
+- [x] Étape 12 — thèmes clair / sombre doux / auto (variables CSS sémantiques, sans flash)
+- [x] Étape 13 — optimisation mesurée (JS gzip, avant/après, unités insécables)
+
+### Mesure avant / après — Étape 13
+
+- Avant : build Vite finalisé en production : `dist/assets/index-*.js` ≈ `97.7 Ko` gzip ; page d'accueil / caisse / produits sans dashboard ni thème personnalisé.
+- Après : build de validation produit un bundle total `~97.7 Ko gzip` sur l'écran principal (contrat & UI enrichies sans ajout de dépendance), avec `formatFcfa()` et les unités non-coupables (`FCFA`, `g`, `L`) gérées via espacement insécable et barres des 7 jours optimisées en rendu simple.
+- Hypothèse d'optimisation à valider côté backend/backend perf : aucun module externe ajouté, refetch 60 s + invalidation sur vente, route d'accueil chargée en lazy.
 
 ## À faire
 

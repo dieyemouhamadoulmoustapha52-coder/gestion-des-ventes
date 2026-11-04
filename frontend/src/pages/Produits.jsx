@@ -3,19 +3,20 @@
  * tableau paginé, recherche (debounce 250 ms), filtre catégorie,
  * badges stock bas / rupture, CRUD en modal, suppression confirmée.
  */
-import { useMemo, useState } from 'react'
-import { Package, Pencil, Plus, Search, Tags, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Package, PackagePlus, Pencil, Plus, Search, Tags, Trash2 } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import CategorieManager from '../components/CategorieManager.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
+import Modal from '../components/Modal.jsx'
 import Pagination from '../components/Pagination.jsx'
 import ProduitModal from '../components/ProduitModal.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useToast } from '../components/Toast.jsx'
-import { useCategories, useDeleteProduit, useProduits } from '../hooks/queries.js'
+import { useCategories, useDeleteProduit, useProduits, useReapprovisionnerProduit } from '../hooks/queries.js'
 import { formatFcfa } from '../lib/money.js'
 import { useDebounce } from '../lib/useDebounce.js'
 
@@ -34,9 +35,14 @@ function RowSkeleton() {
 export default function Produits() {
   const [search, setSearch] = useState('')
   const [categorie, setCategorie] = useState('')
+  const [stockBas, setStockBas] = useState(() =>
+    new URLSearchParams(window.location.search).get('stock_bas') === 'true',
+  )
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState(null) // 'create' | Produit | null
   const [toDelete, setToDelete] = useState(null)
+  const [reappro, setReappro] = useState(null)
+  const [reapproQte, setReapproQte] = useState('')
   const [managerOpen, setManagerOpen] = useState(false)
 
   const debouncedSearch = useDebounce(search, 250)
@@ -45,22 +51,36 @@ export default function Produits() {
     () => ({
       search: debouncedSearch || undefined,
       categorie: categorie || undefined,
+      stock_bas: stockBas || undefined,
       page,
     }),
-    [debouncedSearch, categorie, page],
+    [debouncedSearch, categorie, stockBas, page],
   )
   const produits = useProduits(params)
   const del = useDeleteProduit()
+  const reapproMutation = useReapprovisionnerProduit()
   const toast = useToast()
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    if (stockBas) searchParams.set('stock_bas', 'true')
+    else searchParams.delete('stock_bas')
+    const next = searchParams.toString() ? `?${searchParams.toString()}` : ''
+    const target = `${window.location.pathname}${next}`
+    if (window.location.search !== next) {
+      window.history.replaceState({}, '', target)
+    }
+  }, [stockBas])
 
   const count = produits.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const catList = categories.data?.results ?? []
-  const hasFilters = Boolean(debouncedSearch || categorie)
+  const hasFilters = Boolean(debouncedSearch || categorie || stockBas)
 
   const resetFilters = () => {
     setSearch('')
     setCategorie('')
+    setStockBas(false)
     setPage(1)
   }
 
@@ -71,10 +91,34 @@ export default function Produits() {
         setToDelete(null)
       },
       onError: (err) => {
-        toast.error(err.detail || 'Suppression impossible.')
+        const message = err.detail
+          ? `${err.detail} Le stock peut être ramené à 0 pour retirer le produit sans l’effacer du catalogue.`
+          : 'Suppression impossible.'
+        toast.error(message)
         setToDelete(null)
       },
     })
+  }
+
+  const submitReappro = () => {
+    const q = Number(reapproQte)
+    if (!Number.isInteger(q) || q <= 0) {
+      toast.error('La quantité doit être un entier strictement positif.')
+      return
+    }
+    reapproMutation.mutate(
+      { id: reappro.id, quantite: q },
+      {
+        onSuccess: () => {
+          toast.success(`Stock de « ${reappro.nom} » mis à jour.`)
+          setReappro(null)
+          setReapproQte('')
+        },
+        onError: (err) => {
+          toast.error(err.detail || 'Réapprovisionnement impossible.')
+        },
+      },
+    )
   }
 
   return (
@@ -86,6 +130,9 @@ export default function Produits() {
           <p className="text-sm text-slate-500">{count} produit{count > 1 ? 's' : ''} au catalogue</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setStockBas((v) => !v)}>
+            {stockBas ? 'Tous les produits' : 'Stock bas'}
+          </Button>
           <Button variant="secondary" onClick={() => setManagerOpen(true)}>
             <Tags size={16} aria-hidden="true" />
             Catégories
@@ -217,6 +264,14 @@ export default function Produits() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
+                          onClick={() => setReappro(p)}
+                          aria-label={`Réapprovisionner ${p.nom}`}
+                          className="flex h-11 w-11 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50"
+                        >
+                          <PackagePlus size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => setModal(p)}
                           aria-label={`Modifier ${p.nom}`}
                           className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
@@ -254,6 +309,54 @@ export default function Produits() {
         categories={catList}
         onClose={() => setModal(null)}
       />
+      <Modal
+        open={Boolean(reappro)}
+        title={`Réapprovisionner — ${reappro?.nom ?? ''}`}
+        onClose={() => {
+          setReappro(null)
+          setReapproQte('')
+        }}
+        size="md"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => {
+              setReappro(null)
+              setReapproQte('')
+            }} disabled={reapproMutation.isPending}>
+              Annuler
+            </Button>
+            <Button onClick={submitReappro} disabled={reapproMutation.isPending}>
+              {reapproMutation.isPending ? 'Ajout…' : 'Ajouter au stock'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <label htmlFor="reap-qty" className="block text-sm font-medium text-slate-700">
+            Quantité à ajouter
+          </label>
+          <input
+            id="reap-qty"
+            type="number"
+            min="1"
+            step="1"
+            value={reapproQte}
+            onChange={(e) => setReapproQte(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                submitReappro()
+              }
+            }}
+            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+            placeholder="12"
+            autoFocus
+          />
+          <p className="text-xs text-slate-500">
+            Stock actuel : <strong>{reappro?.stock ?? 0}</strong>
+          </p>
+        </div>
+      </Modal>
       <CategorieManager open={managerOpen} onClose={() => setManagerOpen(false)} />
       <ConfirmDialog
         open={Boolean(toDelete)}
