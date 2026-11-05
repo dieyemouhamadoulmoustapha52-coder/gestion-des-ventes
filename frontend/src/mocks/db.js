@@ -112,33 +112,63 @@ export const MODE_LABELS = {
 export const money = (n) => Number(n).toFixed(2)
 
 const CATEGORIES = [
-  { id: 1, nom: 'Épicerie', description: 'Alimentation de base' },
-  { id: 2, nom: 'Boissons', description: 'Eaux, jus et rafraîchissements' },
-  { id: 3, nom: 'Hygiène', description: 'Entretien et hygiène corporelle' },
+  { id: 1, nom: 'Épicerie', description: 'Alimentation de base et essentiels du foyer' },
+  { id: 2, nom: 'Boissons', description: 'Eaux, jus et boissons de maison' },
+  { id: 3, nom: 'Hygiène', description: 'Produits d’entretien et nettoyage' },
+  { id: 4, nom: 'Électroménager', description: 'Petit électroménager pour la maison' },
+  { id: 5, nom: 'Bricolage', description: 'Quincaillerie, outils et fixation' },
+  { id: 6, nom: 'Maison', description: 'Décoration, rangement et confort domestique' },
 ]
 
 /**
- * prix en FCFA entiers ; `seuil` DISTINCT par produit — l'état d'alerte
- * (stock <= seuil) varie donc d'un produit à l'autre et pilote le badge
- * « Stock bas » via `est_en_alerte` : HUILE5 et BISSAP en alerte,
- * JAVEL en rupture (stock 0), les autres au-dessus de leur seuil.
+ * Catalogue étendu orienté démonstration : mix alimentaire + matériels domestiques.
+ * Les `seuil` permettent d’exercer plusieurs scénarios de stock bas/rupture
+ * dans l’interface (alerte, rupture, dashboard, réapprovisionnement).
  */
 const PRODUITS = [
+  // Épicerie
   { id: 1, code: 'RIZ25', nom: 'Riz parfumé 25 kg', categorie: 1, prix: 15500, stock: 8, seuil: 5 },
   { id: 2, code: 'HUILE5', nom: 'Huile 5 L', categorie: 1, prix: 6200, stock: 4, seuil: 6 },
   { id: 3, code: 'SUCRE1', nom: 'Sucre 1 kg', categorie: 1, prix: 750, stock: 30, seuil: 12 },
   { id: 4, code: 'LAIT400', nom: 'Lait en poudre 400 g', categorie: 1, prix: 2750, stock: 10, seuil: 4 },
   { id: 5, code: 'CAFE', nom: 'Café Touba 250 g', categorie: 1, prix: 1200, stock: 15, seuil: 7 },
-  { id: 6, code: 'BISSAP', nom: 'Jus de bissap 1 L', categorie: 2, prix: 1000, stock: 6, seuil: 8 },
-  { id: 7, code: 'EAU15', nom: 'Eau minérale 1,5 L', categorie: 2, prix: 350, stock: 40, seuil: 15 },
-  { id: 8, code: 'SAVON', nom: 'Savon de Marseille', categorie: 3, prix: 400, stock: 20, seuil: 9 },
-  { id: 9, code: 'JAVEL', nom: 'Eau de Javel 1 L', categorie: 3, prix: 600, stock: 0, seuil: 3 },
+  { id: 6, code: 'GRAINS', nom: 'Grains de mil 5 kg', categorie: 1, prix: 3900, stock: 17, seuil: 8 },
+
+  // Boissons
+  { id: 7, code: 'BISSAP', nom: 'Jus de bissap 1 L', categorie: 2, prix: 1000, stock: 6, seuil: 8 },
+  { id: 8, code: 'EAU15', nom: 'Eau minérale 1,5 L', categorie: 2, prix: 350, stock: 40, seuil: 15 },
+  { id: 9, code: 'JUSOR', nom: 'Jus d’orange 1 L', categorie: 2, prix: 1200, stock: 23, seuil: 10 },
+  { id: 10, code: 'COLA', nom: 'Boisson gazeuse 1,5 L', categorie: 2, prix: 1500, stock: 18, seuil: 9 },
+
+  // Hygiène / entretien
+  { id: 11, code: 'SAVON', nom: 'Savon de Marseille', categorie: 3, prix: 400, stock: 20, seuil: 9 },
+  { id: 12, code: 'JAVEL', nom: 'Eau de Javel 1 L', categorie: 3, prix: 600, stock: 0, seuil: 3 },
+  { id: 13, code: 'DETERG', nom: 'Détergent liquide 2 L', categorie: 3, prix: 1800, stock: 12, seuil: 5 },
+  { id: 14, code: 'PAPIER', nom: 'Papier toilette 12 rouleaux', categorie: 3, prix: 2500, stock: 9, seuil: 4 },
+
+  // Électroménager
+  { id: 15, code: 'FAN', nom: 'Ventilateur de plafond', categorie: 4, prix: 24000, stock: 6, seuil: 3 },
+  { id: 16, code: 'BLENDER', nom: 'Blender 1,5 L', categorie: 4, prix: 19500, stock: 9, seuil: 4 },
+  { id: 17, code: 'PRESSE', nom: 'Cafetière électrique', categorie: 4, prix: 17500, stock: 5, seuil: 3 },
+  { id: 18, code: 'LAMPE', nom: 'Lampe LED 9 W', categorie: 4, prix: 3200, stock: 14, seuil: 6 },
+
+  // Bricolage
+  { id: 19, code: 'VIS', nom: 'Lot de vis 100 pcs', categorie: 5, prix: 1200, stock: 25, seuil: 10 },
+  { id: 20, code: 'SCIE', nom: 'Scie à métaux', categorie: 5, prix: 8500, stock: 7, seuil: 4 },
+  { id: 21, code: 'CLAMP', nom: 'Pince universelle', categorie: 5, prix: 2800, stock: 13, seuil: 6 },
+  { id: 22, code: 'NAS', nom: 'Nailon de fixation 3 mm', categorie: 5, prix: 1500, stock: 16, seuil: 8 },
+
+  // Maison / décoration
+  { id: 23, code: 'CADDY', nom: 'Caddy de rangement', categorie: 6, prix: 7500, stock: 8, seuil: 4 },
+  { id: 24, code: 'TAPIS', nom: 'Tapis de salon 1,5 x 2 m', categorie: 6, prix: 32000, stock: 4, seuil: 2 },
+  { id: 25, code: 'LAMPON', nom: 'Lampe de table', categorie: 6, prix: 6000, stock: 11, seuil: 5 },
+  { id: 26, code: 'CORDE', nom: 'Corde à linge 20 m', categorie: 6, prix: 2100, stock: 18, seuil: 7 },
 ]
 
 const HISTO = genererHistorique(PRODUITS)
 
 export const state = {
-  seq: { categorie: 4, produit: 10, vente: HISTO.seqVente, ligne: HISTO.seqLigne },
+  seq: { categorie: 7, produit: 27, vente: HISTO.seqVente, ligne: HISTO.seqLigne },
   categories: CATEGORIES,
   produits: PRODUITS,
   ventes: HISTO.ventes,
