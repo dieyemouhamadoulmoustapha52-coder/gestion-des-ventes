@@ -72,9 +72,40 @@ html[data-theme='sombre'] .border-slate-500 {
   border-color: var(--border) !important;
 }
 
+html[data-theme='sombre'] .hover\:border-slate-400:hover {
+  border-color: #94a3b8 !important;
+}
+
 html[data-theme='sombre'] .shadow-sm,
 html[data-theme='sombre'] .shadow {
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.22) !important;
+}
+
+/* Survols à fond clair (Tailwind -50 / -100) : en mode sombre ils produisent
+   un éclair quasi blanc sur du texte clair — on les recale sur le thème. */
+html[data-theme='sombre'] .hover\:bg-slate-50:hover,
+html[data-theme='sombre'] .hover\:bg-slate-100:hover {
+  background-color: var(--surface-alt) !important;
+}
+
+html[data-theme='sombre'] .hover\:bg-emerald-50:hover {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+html[data-theme='sombre'] .hover\:bg-red-50:hover {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+}
+
+/* Tableaux de données : survol de ligne fluide et thème-aware
+   (clair : --surface-alt #f1f5f9, sombre : --surface-alt #2d3d52,
+   légèrement plus clair que --surface #243145).
+   Le ticket d'impression (.ticket-table) est exclu : fond blanc / texte noir. */
+table:not(.ticket-table) tbody tr {
+  transition: background-color 200ms var(--ease-in-out);
+}
+
+table:not(.ticket-table) tbody tr:hover {
+  background-color: var(--surface-alt);
 }
 
 html {

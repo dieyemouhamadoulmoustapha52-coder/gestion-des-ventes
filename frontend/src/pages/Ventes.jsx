@@ -172,7 +172,7 @@ export default function Ventes() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {ventes.data.results.map((v) => (
-                  <tr key={v.id} className="hover:bg-slate-50">
+                  <tr key={v.id} className="transition-colors duration-200 ease-in-out">
                     <td className="px-4 py-3 font-semibold text-slate-900">#{v.id}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                       {DTF.format(new Date(v.date_vente))}
@@ -190,7 +190,7 @@ export default function Ventes() {
                         type="button"
                         onClick={() => setSelectedId(v.id)}
                         aria-label={`Voir le détail de la vente n° ${v.id}`}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
                       >
                         <Eye size={16} aria-hidden="true" />
                         Détail

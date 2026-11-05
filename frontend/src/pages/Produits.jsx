@@ -242,7 +242,7 @@ export default function Produits() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {produits.data.results.map((p) => (
-                  <tr key={p.id} className="hover:bg-slate-50">
+                  <tr key={p.id} className="transition-colors duration-200 ease-in-out">
                     <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.code}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">{p.nom}</td>
                     <td className="px-4 py-3 text-slate-600">{p.categorie_nom}</td>
