@@ -31,8 +31,8 @@ function Brand() {
         {boutique.sigle}
       </span>
       <div className="leading-tight">
-        <p className="text-sm font-bold text-slate-900">{boutique.nom}</p>
-        <p className="text-xs text-slate-500">{boutique.devise}</p>
+        <p className="text-sm font-bold text-[var(--text)]">{boutique.nom}</p>
+        <p className="text-xs text-[var(--muted)]">{boutique.devise}</p>
       </div>
     </>
   )
@@ -47,7 +47,7 @@ function ThemeSelector() {
   }, [theme])
 
   return (
-    <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+    <div className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 shadow-sm">
       {THEME_OPTIONS.map((option) => (
         <button
           key={option.value}
@@ -55,8 +55,8 @@ function ThemeSelector() {
           onClick={() => setTheme(option.value)}
           className={`min-h-9 rounded-full px-3 text-xs font-medium transition ${
             theme === option.value
-              ? 'bg-slate-900 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-[var(--text)] text-[var(--bg)]'
+              : 'text-[var(--muted)] hover:bg-[var(--surface-alt)]'
           }`}
         >
           {option.label}
