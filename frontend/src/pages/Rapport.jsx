@@ -11,10 +11,10 @@ import ErrorState from '../components/ErrorState.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useRapport } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
+import { isoDateDakar } from '../lib/dates.js'
 import { formatFcfa } from '../lib/money.js'
 
-const toISODate = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const toISODate = (d) => isoDateDakar(d)
 
 /** Part en % (1 décimale, virgule française). */
 const share = (value, total) =>
