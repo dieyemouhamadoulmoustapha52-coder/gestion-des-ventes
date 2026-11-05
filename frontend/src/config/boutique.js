@@ -1,13 +1,15 @@
 import { createContext, createElement, useContext, useEffect, useMemo } from 'react'
 
 export const DEFAULT_BOUTIQUE = {
-  nom: 'Gestion des ventes',
-  sigle: 'GV',
+  nom: 'Wagué Bussness Halal',
+  sigle: 'WBH',
   couleur: '#2563eb',
   adresse: 'Dakar, Sénégal',
   telephone: '+221 77 000 00 00',
   message_ticket: 'Merci pour votre achat !',
-  devise: 'FCFA',
+  reseaux: '@waguebussness',
+  caissier: 'Caisse principale',
+  devise: 'Satisfaction de nos clients',
 }
 
 const BoutiqueContext = createContext(DEFAULT_BOUTIQUE)

@@ -12,17 +12,21 @@ import ErrorState from '../components/ErrorState.jsx'
 import Pagination from '../components/Pagination.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import Ticket from '../components/Ticket.jsx'
+import { useBoutique } from '../config/boutique.js'
 import { useVente, useVentes } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
+import { FUSEAU } from '../lib/dates.js'
 import { formatFcfa } from '../lib/money.js'
 
 const PAGE_SIZE = 10
 const DTF = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: FUSEAU,
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
   hour: '2-digit',
   minute: '2-digit',
+  hour12: false,
 })
 
 const MODE_TONES = {
@@ -55,6 +59,7 @@ export default function Ventes() {
   )
   const ventes = useVentes(params)
   const detail = useVente(selectedId)
+  const boutique = useBoutique()
 
   const count = ventes.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
@@ -284,7 +289,7 @@ export default function Ventes() {
       </Drawer>
 
       {/* Réimpression */}
-      <Ticket vente={reprint} open={Boolean(reprint)} onClose={() => setReprint(null)} />
+      <Ticket vente={reprint} boutique={boutique} open={Boolean(reprint)} onClose={() => setReprint(null)} />
     </div>
   )
 }

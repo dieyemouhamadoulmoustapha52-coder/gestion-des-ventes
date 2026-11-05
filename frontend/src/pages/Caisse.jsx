@@ -14,6 +14,7 @@ import Skeleton from '../components/Skeleton.jsx'
 import Ticket from '../components/Ticket.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { isStockError } from '../api/client.js'
+import { useBoutique } from '../config/boutique.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
@@ -37,6 +38,7 @@ export default function Caisse() {
     categorie: categorie || undefined,
   })
   const cart = useCart()
+  const boutique = useBoutique()
   const creer = useCreerVente()
   const toast = useToast()
 
@@ -361,7 +363,7 @@ export default function Caisse() {
         </aside>
       </div>
 
-      <Ticket vente={ticket} open={Boolean(ticket)} onClose={() => setTicket(null)} />
+      <Ticket vente={ticket} boutique={boutique} open={Boolean(ticket)} onClose={() => setTicket(null)} />
     </div>
   )
 }
