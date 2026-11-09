@@ -28,6 +28,12 @@ pip-wheel-metadata/
 logs/
 db.sqlite3
 db.sqlite3-journal
+*.sqlite3
+*.sqlite
+*.db
+*.db3
+*.dump
+*.sql.gz
 staticfiles/
 static/
 media/
