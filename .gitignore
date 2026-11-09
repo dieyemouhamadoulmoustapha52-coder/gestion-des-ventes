@@ -114,3 +114,11 @@ tmp/
 *.seed
 *.pid.lock
 .cache/
+
+# ---------- Archives (peuvent contenir .env / .venv) ----------
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
