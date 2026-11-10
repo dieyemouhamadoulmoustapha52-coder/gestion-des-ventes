@@ -37,30 +37,30 @@ export default function MessageBar() {
 
   const current = messages[index] ?? null
   const niveau = current ? NIVEAUX[current.niveau] : null
+  const ephemere = messages.find((m) => m.ephemere) ?? null
 
   // Décompte du message éphémère : 4 s, en pause au survol et au focus.
+  // Indépendant de l'index : le décompte continue même si l'on navigue ailleurs.
   useEffect(() => {
-    setReste(current?.ephemere ? current.duree ?? DUREE_EPHEMERE : null)
-  }, [current?.id, current?.ephemere, current?.duree])
+    setReste(ephemere ? ephemere.duree ?? DUREE_EPHEMERE : null)
+  }, [ephemere?.id, ephemere?.duree])
 
   useEffect(() => {
-    if (reste === null || pause || !current?.ephemere) return
+    if (reste === null || pause || !ephemere) return
     if (reste <= 0) {
-      expire(current.id)
+      expire(ephemere.id)
       return
     }
     const timer = setTimeout(() => setReste((r) => Math.max(0, r - 100)), 100)
     return () => clearTimeout(timer)
-  }, [reste, pause, current, expire])
+  }, [reste, pause, ephemere, expire])
 
   useEffect(() => {
     if (messages.length === 0) setExpanded(false)
   }, [messages.length])
 
-  if (!current || !niveau) return null
-
-  const { Icon, label, couleur } = niveau
   const total = messages.length
+  const critique = current?.niveau === 'critique'
 
   const onKeyDown = (e) => {
     if (e.key === 'Escape' && expanded) {
@@ -69,12 +69,20 @@ export default function MessageBar() {
     }
   }
 
+  // Région live toujours montée (sr-only à vide → aucun espace visuel) :
+  // le lecteur d'écran annonce l'arrivée/le changement de message.
+  if (!current || !niveau) {
+    return <div className="sr-only" role="status" aria-live="polite" />
+  }
+
+  const { Icon, label, couleur } = niveau
+
   return (
     <div
       className="border-b border-[var(--border)] bg-[var(--surface)]"
       style={{ borderLeft: `4px solid ${couleur}` }}
-      role={current.niveau === 'critique' ? 'alert' : 'status'}
-      aria-live={current.niveau === 'critique' ? undefined : 'polite'}
+      role={critique ? 'alert' : 'status'}
+      aria-live={critique ? undefined : 'polite'}
       onMouseEnter={() => setPause(true)}
       onMouseLeave={() => setPause(false)}
       onFocusCapture={() => setPause(true)}
