@@ -16,6 +16,7 @@ import { useToast } from '../components/Toast.jsx'
 import { isStockError } from '../api/client.js'
 import { useBoutique } from '../config/boutique.js'
 import { useCart } from '../context/CartContext.jsx'
+import { useMessages } from '../context/MessagesContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
 import { formatFcfa } from '../lib/money.js'
@@ -41,6 +42,7 @@ export default function Caisse() {
   const boutique = useBoutique()
   const creer = useCreerVente()
   const toast = useToast()
+  const { notifyVente } = useMessages()
 
   const list = useMemo(() => produits.data?.results ?? [], [produits.data])
   const catList = categories.data?.results ?? []
@@ -70,6 +72,7 @@ export default function Caisse() {
       {
         onSuccess: (vente) => {
           toast.success(`Vente n° ${vente.id} encaissée — ${formatFcfa(vente.montant_total)}.`)
+          notifyVente(formatFcfa(vente.montant_total))
           setTicket(vente)
           cart.clear()
         },
