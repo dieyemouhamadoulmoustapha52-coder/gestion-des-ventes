@@ -8,6 +8,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useBoutique } from '../config/boutique.js'
 import { applyTheme, getStoredTheme, THEME_KEY, THEME_OPTIONS } from '../config/theme.js'
 import DemoBanner from './DemoBanner.jsx'
+import MessageBar from './MessageBar.jsx'
 import PageSkeleton from './PageSkeleton.jsx'
 
 const NAV = [
@@ -106,6 +107,7 @@ export default function Layout() {
       </header>
 
       <main className="lg:pl-64">
+        <MessageBar />
         <div className="mx-auto max-w-6xl px-4 py-6 pb-28 lg:pb-10">
           <div className="mb-4 flex justify-end">
             <ThemeSelector />
