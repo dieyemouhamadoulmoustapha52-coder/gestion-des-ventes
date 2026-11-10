@@ -19,7 +19,7 @@ import Skeleton from '../components/Skeleton.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { useCategories, useDeleteProduit, useProduits, useReapprovisionnerProduit } from '../hooks/queries.js'
 import { formatFcfa } from '../lib/money.js'
-import { useDebounce } from '../lib/useDebounce.js'
+import { useDebouncedValue } from '../lib/useDebounce.js'
 
 const PAGE_SIZE = 10 // convention de pagination DRF (docs/API_CONTRACT.md)
 
@@ -46,7 +46,7 @@ export default function Produits() {
   const [reapproQte, setReapproQte] = useState('')
   const [managerOpen, setManagerOpen] = useState(false)
 
-  const debouncedSearch = useDebounce(search, 250)
+  const debouncedSearch = useDebouncedValue(search, 250)
   const location = useLocation()
 
   // Le filtre « stock critique » peut être poussé par la barre de messages

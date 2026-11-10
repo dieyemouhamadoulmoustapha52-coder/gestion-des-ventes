@@ -71,7 +71,8 @@ export function useVentes(params) {
  * Totaux du jeu FILTRÉ de l'Historique (nombre + montant FCFA) —
  * @audience patron. Invalide avec la clé ['ventes'].
  * @param {{date?: string, date_debut?: string, date_fin?: string,
- *          produit?: number|string, mode_paiement?: string}} params
+ *          produit?: number|string, mode_paiement?: string,
+ *          search?: string}} params
  * @returns {import('@tanstack/react-query').UseQueryResult<{count: number, total: number}>}
  */
 export function useTotauxVentes(params) {

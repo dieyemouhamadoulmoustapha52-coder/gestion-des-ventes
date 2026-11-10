@@ -269,11 +269,18 @@ export const handlers = [
     const fin = u.searchParams.get('date_fin')
     const produit = u.searchParams.get('produit')
     const mode = u.searchParams.get('mode_paiement')
+    const search = u.searchParams.get('search')
 
     let list = [...db.state.ventes].sort((a, b) => b.date_vente.localeCompare(a.date_vente))
     if (date) list = list.filter((v) => v.date_vente.slice(0, 10) === date)
     if (debut) list = list.filter((v) => v.date_vente.slice(0, 10) >= debut)
     if (fin) list = list.filter((v) => v.date_vente.slice(0, 10) <= fin)
+    if (search) {
+      const q = fold(search)
+      list = list.filter(
+        (v) => String(v.id).includes(search.trim()) || fold(v.client_nom).includes(q),
+      )
+    }
     if (produit) {
       const pid = Number(produit)
       const idsVentes = new Set(

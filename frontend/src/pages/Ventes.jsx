@@ -23,6 +23,7 @@ import { MODE_LABELS } from '../lib/constants.js'
 import { dateDakar, decaleJours, FUSEAU } from '../lib/dates.js'
 import { genererCsvVentes, nomFichierCsv, telechargerCsv } from '../lib/exportCsv.js'
 import { formatFcfa } from '../lib/money.js'
+import { useDebouncedValue } from '../lib/useDebounce.js'
 import { buildWhatsAppLink, ouvrirWhatsApp } from '../lib/whatsapp.js'
 
 const DTF = new Intl.DateTimeFormat('fr-FR', {
@@ -47,6 +48,7 @@ function lireFiltres() {
   const p = new URLSearchParams(window.location.search)
   const taille = Number(p.get('page_size'))
   return {
+    search: p.get('search') || '',
     du: p.get('du') || '',
     au: p.get('au') || '',
     produit: p.get('produit') || '',
@@ -68,6 +70,7 @@ function RowSkeleton() {
 
 export default function Ventes() {
   const [f, setF] = useState(lireFiltres)
+  const [recherche, setRecherche] = useState(f.search)
   const [selectedId, setSelectedId] = useState(null)
   const [ticketId, setTicketId] = useState(null)
   const [exportEnCours, setExportEnCours] = useState(false)
@@ -76,9 +79,19 @@ export default function Ventes() {
   const boutique = useBoutique()
   const produits = useProduitsGrille({})
 
+  // Recherche texte → URL après 250 ms de silence (jamais à chaque frappe).
+  const rechercheDebouncee = useDebouncedValue(recherche, 250)
+  useEffect(() => {
+    if (rechercheDebouncee !== f.search) {
+      setFiltre({ search: rechercheDebouncee })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rechercheDebouncee])
+
   // Filtres → URL (remplacement, sans historique parasite).
   useEffect(() => {
     const p = new URLSearchParams()
+    if (f.search) p.set('search', f.search)
     if (f.du) p.set('du', f.du)
     if (f.au) p.set('au', f.au)
     if (f.produit) p.set('produit', f.produit)
@@ -93,19 +106,24 @@ export default function Ventes() {
 
   // Retour/avant du navigateur → resynchronisation des filtres.
   useEffect(() => {
-    const onPop = () => setF(lireFiltres())
+    const onPop = () => {
+      const suivants = lireFiltres()
+      setF(suivants)
+      setRecherche(suivants.search)
+    }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
   const paramsFiltres = useMemo(
     () => ({
+      search: f.search || undefined,
       date_debut: f.du || undefined,
       date_fin: f.au || undefined,
       produit: f.produit || undefined,
       mode_paiement: f.mode || undefined,
     }),
-    [f.du, f.au, f.produit, f.mode],
+    [f.search, f.du, f.au, f.produit, f.mode],
   )
 
   const ventes = useVentes({ ...paramsFiltres, page: f.page, page_size: f.pageSize })
@@ -115,12 +133,14 @@ export default function Ventes() {
 
   const count = ventes.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(count / f.pageSize))
-  const hasFilters = Boolean(f.du || f.au || f.produit || f.mode)
+  const hasFilters = Boolean(f.search || f.du || f.au || f.produit || f.mode)
 
   const setFiltre = (patch) => setF((prev) => ({ ...prev, ...patch, page: 1 }))
 
-  const resetFilters = () =>
-    setF({ du: '', au: '', produit: '', mode: '', page: 1, pageSize: f.pageSize })
+  const resetFilters = () => {
+    setRecherche('')
+    setF({ search: '', du: '', au: '', produit: '', mode: '', page: 1, pageSize: f.pageSize })
+  }
 
   // Raccourcis de période (fuseau Dakar).
   const aujourdhui = dateDakar()
@@ -214,6 +234,19 @@ export default function Ventes() {
         </div>
 
         <div className="flex flex-wrap gap-3">
+          <div>
+            <label htmlFor="v-search" className="block text-xs font-medium text-slate-500">
+              Rechercher
+            </label>
+            <input
+              id="v-search"
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="N° de vente ou client"
+              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-56"
+            />
+          </div>
           <div>
             <label htmlFor="v-du" className="block text-xs font-medium text-slate-500">
               Du

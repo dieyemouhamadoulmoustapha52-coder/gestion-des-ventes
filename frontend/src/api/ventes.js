@@ -14,10 +14,11 @@ const normComplete = (v) => ({ ...normVente(v), lignes: (v.lignes || []).map(nor
  * Liste paginée des ventes (sans lignes).
  * @param {{date?: string, date_debut?: string, date_fin?: string,
  *          produit?: number|string, mode_paiement?: string,
- *          page?: number, page_size?: number}} [params]
+ *          search?: string, page?: number, page_size?: number}} [params]
  *   date : 'YYYY-MM-DD' (jour unique, contrat historique)
  *   date_debut/date_fin : période incluse, format 'YYYY-MM-DD'
- *   produit : id du produit filtré, page/page_size : pagination DRF
+ *   produit : id du produit filtré, search : n° de vente ou client
+ *   page/page_size : pagination DRF
  * @returns {Promise<import('./types.js').Page<import('./types.js').Vente>>}
  */
 export async function listVentes({
@@ -26,6 +27,7 @@ export async function listVentes({
   date_fin,
   produit,
   mode_paiement,
+  search,
   page,
   page_size,
 } = {}) {
@@ -35,6 +37,7 @@ export async function listVentes({
   if (date_fin) qs.set('date_fin', date_fin)
   if (produit) qs.set('produit', String(produit))
   if (mode_paiement) qs.set('mode_paiement', mode_paiement)
+  if (search) qs.set('search', search)
   if (page) qs.set('page', String(page))
   if (page_size) qs.set('page_size', String(page_size))
   const q = qs.toString()
@@ -47,7 +50,7 @@ export async function listVentes({
  * filtré affichés par l'Historique. Pagination DRF jusqu'à épuisement.
  * @param {{date?: string, date_debut?: string, date_fin?: string,
  *          produit?: number|string, mode_paiement?: string,
- *          maxPages?: number}} [params]
+ *          search?: string, maxPages?: number}} [params]
  * @returns {Promise<import('./types.js').Vente[]>}
  */
 export async function listToutesVentes(params = {}) {
@@ -72,7 +75,7 @@ export async function listToutesVentes(params = {}) {
  * N'utilise que des endpoints du contrat — aucun nouveau champ d'API.
  * @param {{date?: string, date_debut?: string, date_fin?: string,
  *          mode_paiement?: string, produit?: number|string,
- *          maxPages?: number}} [params]
+ *          search?: string, maxPages?: number}} [params]
  * @returns {Promise<import('./types.js').VenteComplete[]>}
  */
 export async function listVentesDetaillees(params = {}) {
