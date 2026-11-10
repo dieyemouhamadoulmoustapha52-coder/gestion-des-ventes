@@ -43,6 +43,30 @@ export async function listVentes({
 }
 
 /**
+ * Toutes les ventes d'un filtre (liste légère, sans lignes) — totaux du jeu
+ * filtré affichés par l'Historique. Pagination DRF jusqu'à épuisement.
+ * @param {{date?: string, date_debut?: string, date_fin?: string,
+ *          produit?: number|string, mode_paiement?: string,
+ *          maxPages?: number}} [params]
+ * @returns {Promise<import('./types.js').Vente[]>}
+ */
+export async function listToutesVentes(params = {}) {
+  const maxPages = params.maxPages ?? 30
+  const parPage = 100
+  const premier = await listVentes({ ...params, page: 1, page_size: parPage })
+  let ventes = [...premier.results]
+  let page = 1
+  let next = premier.next
+  while (next && page < maxPages) {
+    page += 1
+    const suite = await listVentes({ ...params, page, page_size: parPage })
+    ventes = ventes.concat(suite.results)
+    next = suite.next
+  }
+  return ventes
+}
+
+/**
  * Toutes les ventes d'une période AVEC leurs lignes (export CSV, rapports,
  * plus vendus). Pagination DRF puis détail par vente, par paquets.
  * N'utilise que des endpoints du contrat — aucun nouveau champ d'API.

@@ -5,7 +5,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '../api/categories.js'
 import { createProduit, deleteProduit, listProduits, updateProduit } from '../api/produits.js'
-import { creerVente, getVente, listVentes, listVentesDetaillees } from '../api/ventes.js'
+import { creerVente, getVente, listToutesVentes, listVentes, listVentesDetaillees } from '../api/ventes.js'
 import { getRapportJour, getTableauDeBord } from '../api/rapports.js'
 import { reapprovisionnerProduit } from '../api/produits.js'
 import { dateDakar, decaleJours } from '../lib/dates.js'
@@ -53,11 +53,37 @@ export function useProduits(params) {
   })
 }
 
-/** @param {{date?: string, mode_paiement?: string, page?: number}} params */
+/**
+ * Liste des ventes paginée (Historique — @audience patron).
+ * @param {{date?: string, date_debut?: string, date_fin?: string,
+ *          produit?: number|string, mode_paiement?: string,
+ *          page?: number, page_size?: number}} params
+ */
 export function useVentes(params) {
   return useQuery({
     queryKey: ['ventes', params],
     queryFn: () => listVentes(params),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * Totaux du jeu FILTRÉ de l'Historique (nombre + montant FCFA) —
+ * @audience patron. Invalide avec la clé ['ventes'].
+ * @param {{date?: string, date_debut?: string, date_fin?: string,
+ *          produit?: number|string, mode_paiement?: string}} params
+ * @returns {import('@tanstack/react-query').UseQueryResult<{count: number, total: number}>}
+ */
+export function useTotauxVentes(params) {
+  return useQuery({
+    queryKey: ['ventes', 'totaux', params],
+    queryFn: async () => {
+      const liste = await listToutesVentes(params)
+      return {
+        count: liste.length,
+        total: liste.reduce((s, v) => s + (Number(v.montant_total) || 0), 0),
+      }
+    },
     placeholderData: keepPreviousData,
   })
 }
