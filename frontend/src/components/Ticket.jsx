@@ -1,126 +1,112 @@
-/** Ticket de vente imprimable — largeur 80 mm, format thermique. */
-import { Printer } from 'lucide-react'
+/**
+ * Ticket de vente imprimable — 80 mm, format thermique, N&B.
+ * Affiché EN LIGNE (aucune popup) : aperçu + bouton « Imprimer le ticket ».
+ * À l'impression : seul le ticket est imprimé (@page 80mm, voir Ticket.css).
+ */
+import { Printer, X } from 'lucide-react'
 import Button from './Button.jsx'
-import Modal from './Modal.jsx'
 import { DEFAULT_BOUTIQUE } from '../config/boutique.js'
 import { MODE_LABELS } from '../lib/constants.js'
 import { dateHeureDakar } from '../lib/dates.js'
-import { formatFcfa } from '../lib/money.js'
+import { formatFcfa, toNumber } from '../lib/money.js'
 import './Ticket.css'
 
-const safeValue = (value, fallback) => (value ?? fallback)
-
 /**
-* @param {{
-*   open: boolean,
-*   onClose: () => void,
-*   vente: (import('../api/types.js').VenteComplete & {
-*      montant_recu?: number,
-*      monnaie_rendue?: number,
-*      client_nom?: string,
-*      caissier?: string,
-*   }) | null,
-*   boutique?: Partial<typeof DEFAULT_BOUTIQUE>
-* }} props
-*/
-export default function Ticket({ open, onClose, vente, boutique = {} }) {
- if (!vente) return null
+ * @param {{
+ *   vente: (import('../api/types.js').VenteComplete & {
+ *      montant_recu?: number,
+ *      monnaie_rendue?: number,
+ *   }) | null,
+ *   boutique?: Partial<typeof DEFAULT_BOUTIQUE>,
+ *   onFermer?: () => void,
+ * }} props
+ */
+export default function Ticket({ vente, boutique = {}, onFermer }) {
+  if (!vente) return null
 
- const shop = { ...DEFAULT_BOUTIQUE, ...boutique }
- const productionDate = new Date(vente.date_vente)
- const qteTotale = vente.lignes.reduce((sum, item) => sum + (Number(item.quantite) || 0), 0)
- const totalHt = Number(vente.montant_total || 0) / 1.18
- const tva = Number(vente.montant_total || 0) - totalHt
- const montantRecu = Number(safeValue(vente.montant_recu, vente.montant_total))
- const monnaieRendue = Number(safeValue(vente.monnaie_rendue, 0))
+  const shop = { ...DEFAULT_BOUTIQUE, ...boutique }
+  const lignes = vente.lignes ?? []
+  const recu = vente.montant_recu !== undefined && vente.montant_recu !== null
+  const rendu = vente.monnaie_rendue !== undefined && vente.monnaie_rendue !== null
 
- return (
-   <Modal
-     open={open}
-     title={`Ticket — vente n° ${vente.id}`}
-     onClose={onClose}
-     footer={
-       <Button onClick={() => window.print()}>
-         <Printer size={16} aria-hidden="true" />
-         Imprimer le ticket
-       </Button>
-     }
-   >
-     <div className="ticket-print" aria-label={`Ticket de caisse n° ${vente.id}`}>
-       <header className="ticket-header">
-         <div className="ticket-brand-block">
-           <div className="ticket-brand-name">{shop.nom || 'NOM STE'}</div>
-           <div className="ticket-brand-meta">{shop.adresse || 'Adresse boutique'}</div>
-         </div>
-         <div className="ticket-logo-box">{shop.sigle || 'LOGO'}</div>
-       </header>
+  return (
+    <section className="space-y-3" aria-label={`Ticket de caisse n° ${vente.id}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Ticket — vente n° {vente.id}
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => window.print()}>
+            <Printer size={16} aria-hidden="true" />
+            Imprimer le ticket
+          </Button>
+          {onFermer ? (
+            <Button variant="ghost" onClick={onFermer}>
+              <X size={16} aria-hidden="true" />
+              Fermer
+            </Button>
+          ) : null}
+        </div>
+      </div>
 
-       <div className="ticket-meta">
-         <div>Ticket N°: {vente.id}</div>
-         <div>{dateHeureDakar(productionDate)}</div>
-       </div>
+      <div className="ticket-print">
+        <header className="ticket-header">
+          <div className="ticket-brand-block">
+            <div className="ticket-brand-name">{shop.nom || 'Boutique'}</div>
+            {shop.adresse ? <div className="ticket-brand-meta">{shop.adresse}</div> : null}
+            {shop.telephone ? <div className="ticket-brand-meta">{shop.telephone}</div> : null}
+          </div>
+          {shop.sigle ? <div className="ticket-logo-box">{shop.sigle}</div> : null}
+        </header>
 
-       <table className="ticket-table" aria-label="Détail des articles vendus">
-         <thead>
-           <tr>
-             <th>Nom produits</th>
-             <th>Qte.</th>
-             <th>Prix U</th>
-             <th>Total</th>
-           </tr>
-         </thead>
-         <tbody>
-           {vente.lignes.map((item) => (
-             <tr key={item.id}>
-               <td>{item.produit_nom}</td>
-               <td>{item.quantite}</td>
-               <td>{formatFcfa(item.prix_unitaire)}</td>
-               <td>{formatFcfa(item.montant_ligne)}</td>
-             </tr>
-           ))}
-         </tbody>
-       </table>
+        <div className="ticket-meta">
+          <div>Ticket N°: {vente.id}</div>
+          <div>{dateHeureDakar(new Date(vente.date_vente))}</div>
+        </div>
 
-       <div className="ticket-rule">-----</div>
+        <div className="ticket-lignes" aria-label="Détail des articles vendus">
+          {lignes.map((l) => (
+            <div key={l.id} className="ticket-ligne">
+              <p className="ticket-ligne-nom">{l.produit_nom}</p>
+              <div className="ticket-ligne-meta">
+                <span>
+                  {l.quantite} × {formatFcfa(l.prix_unitaire)}
+                </span>
+                <span>{formatFcfa(l.montant_ligne)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
 
-       <div className="ticket-summary-row">
-         <span>Qté totale</span>
-         <strong>{qteTotale}</strong>
-       </div>
-       <div className="ticket-summary-row">
-         <span>HT</span>
-         <strong>{formatFcfa(totalHt)}</strong>
-       </div>
-       <div className="ticket-summary-row">
-         <span>TVA (18%)</span>
-         <strong>{formatFcfa(tva)}</strong>
-       </div>
-       <div className="ticket-total-row">
-         <span>Total à payer</span>
-         <strong>{formatFcfa(vente.montant_total)}</strong>
-       </div>
+        <div className="ticket-rule">-----</div>
 
-       <div className="ticket-rule">-----</div>
+        <div className="ticket-total-row">
+          <span>Total</span>
+          <strong>{formatFcfa(vente.montant_total)}</strong>
+        </div>
 
-       <div className="ticket-summary-row">
-         <span>Reçu</span>
-         <strong>{formatFcfa(montantRecu)}</strong>
-       </div>
-       <div className="ticket-summary-row">
-         <span>Monnaie</span>
-         <strong>{formatFcfa(monnaieRendue)}</strong>
-       </div>
+        <div className="ticket-summary-row">
+          <span>Règlement</span>
+          <strong>{MODE_LABELS[vente.mode_paiement] || vente.mode_paiement || '—'}</strong>
+        </div>
 
-       <div className="ticket-footer">
-         <div>Caissier: {vente.caissier || shop.caissier || 'CAISSIER'}</div>
-         <div>Client: {vente.client_nom || 'Client de passage'}</div>
-         <div>Règlement: {MODE_LABELS[vente.mode_paiement] || vente.mode_paiement}</div>
-         <div className="ticket-thanks">
-           {shop.message_ticket || 'Merci pour votre achat !'} • {shop.reseaux || '@NOMSTE'}
-         </div>
-       </div>
-     </div>
-   </Modal>
- )
+        {recu ? (
+          <div className="ticket-summary-row">
+            <span>Reçu</span>
+            <strong>{formatFcfa(toNumber(vente.montant_recu))}</strong>
+          </div>
+        ) : null}
+        {rendu ? (
+          <div className="ticket-summary-row">
+            <span>Monnaie</span>
+            <strong>{formatFcfa(toNumber(vente.monnaie_rendue))}</strong>
+          </div>
+        ) : null}
+
+        <div className="ticket-footer">
+          <div className="ticket-thanks">{shop.piedTicket || 'Merci de votre visite'}</div>
+        </div>
+      </div>
+    </section>
+  )
 }
-

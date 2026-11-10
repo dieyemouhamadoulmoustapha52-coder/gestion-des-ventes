@@ -1,3 +1,4 @@
+/* Ticket thermique 80 mm — contenu 72 mm (80 − 2×4 mm), N&B uniquement. */
 .ticket-print {
   width: 80mm;
   max-width: 80mm;
@@ -7,7 +8,7 @@
   font-family: 'Courier New', Courier, monospace;
   font-size: 10.5px;
   line-height: 1.35;
-  padding: 4mm 3mm 5mm;
+  padding: 4mm;
   box-sizing: border-box;
   border: 1px solid #d1d5db;
   letter-spacing: 0.02em;
@@ -39,9 +40,9 @@
 }
 
 .ticket-brand-meta {
-  font-size: 8px;
-  opacity: 0.9;
+  font-size: 9px;
   margin-top: 2px;
+  word-break: break-word;
 }
 
 .ticket-logo-box {
@@ -69,35 +70,29 @@
   font-weight: 700;
 }
 
-.ticket-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 8.7px;
+/* Lignes : nom seul sur sa ligne, puis qté × prix et total de ligne. */
+.ticket-lignes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.ticket-table thead th {
-  border-bottom: 1px solid #000000;
-  padding: 2px 1px 3px;
+.ticket-ligne {
+  break-inside: avoid;
+}
+
+.ticket-ligne-nom {
+  margin: 0;
   font-weight: 700;
-  text-align: left;
-}
-
-.ticket-table tbody td {
-  padding: 2px 1px;
-  vertical-align: top;
   word-break: break-word;
-  border-bottom: 0;
 }
 
-.ticket-table th:nth-child(1),
-.ticket-table td:nth-child(1) { width: 39%; text-align: left; }
-.ticket-table th:nth-child(2),
-.ticket-table td:nth-child(2) { width: 13%; text-align: right; }
-.ticket-table th:nth-child(3),
-.ticket-table td:nth-child(3) { width: 22%; text-align: right; }
-.ticket-table th:nth-child(4),
-.ticket-table td:nth-child(4) { width: 26%; text-align: right; }
+.ticket-ligne-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+}
 
 .ticket-rule {
   margin: 7px 0;
@@ -127,13 +122,9 @@
   padding-top: 6px;
   border-top: 1px dashed #000000;
   font-size: 9px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
 }
 
 .ticket-thanks {
-  margin-top: 4px;
   font-weight: 700;
   text-align: center;
 }
@@ -147,17 +138,25 @@
   html,
   body {
     margin: 0;
-    background: #ffffff;
-    color: #000000;
+    background: #ffffff !important;
+    color: #000000 !important;
   }
 
+  /* Thème forcé en clair à l'impression : aucune couleur, aucun fond. */
   body * {
     visibility: hidden !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    border-color: #000000 !important;
   }
 
   .ticket-print,
   .ticket-print * {
     visibility: visible !important;
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #000000 !important;
   }
 
   .ticket-print {
@@ -168,11 +167,8 @@
     max-width: 80mm !important;
     min-width: 80mm !important;
     margin: 0 !important;
-    padding: 4mm 3mm !important;
-    background: #ffffff !important;
-    color: #000000 !important;
+    padding: 4mm !important;
     border: none !important;
-    box-shadow: none !important;
     border-radius: 0 !important;
   }
 }

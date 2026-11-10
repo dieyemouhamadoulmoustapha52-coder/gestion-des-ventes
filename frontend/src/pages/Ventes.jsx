@@ -68,7 +68,7 @@ function RowSkeleton() {
 export default function Ventes() {
   const [f, setF] = useState(lireFiltres)
   const [selectedId, setSelectedId] = useState(null)
-  const [reprint, setReprint] = useState(null)
+  const [ticketId, setTicketId] = useState(null)
   const [exportEnCours, setExportEnCours] = useState(false)
 
   const toast = useToast()
@@ -110,6 +110,7 @@ export default function Ventes() {
   const ventes = useVentes({ ...paramsFiltres, page: f.page, page_size: f.pageSize })
   const totaux = useTotauxVentes(paramsFiltres)
   const detail = useVente(selectedId)
+  const ticket = useVente(ticketId)
 
   const count = ventes.data?.count ?? 0
   const totalPages = Math.max(1, Math.ceil(count / f.pageSize))
@@ -168,6 +169,25 @@ export default function Ventes() {
           {exportEnCours ? 'Export…' : 'Exporter CSV'}
         </Button>
       </div>
+
+      {/* Ticket de la vente sélectionnée — affiché en ligne (aucune popup) */}
+      {ticketId !== null && ticket.isPending ? (
+        <div className="max-w-sm">
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : ticketId !== null && ticket.isError ? (
+        <div className="max-w-sm">
+          <ErrorState message={ticket.error.detail} onRetry={() => ticket.refetch()} />
+        </div>
+      ) : ticketId !== null && ticket.data ? (
+        <div className="max-w-sm">
+          <Ticket
+            vente={ticket.data}
+            boutique={boutique}
+            onFermer={() => setTicketId(null)}
+          />
+        </div>
+      ) : null}
 
       {/* Filtres */}
       <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
@@ -303,7 +323,7 @@ export default function Ventes() {
                   <th scope="col" className="px-4 py-3">Date</th>
                   <th scope="col" className="px-4 py-3">Mode</th>
                   <th scope="col" className="px-4 py-3">Total</th>
-                  <th scope="col" className="px-4 py-3 text-right">Détail</th>
+                  <th scope="col" className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -322,15 +342,26 @@ export default function Ventes() {
                       {formatFcfa(v.montant_total)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedId(v.id)}
-                        aria-label={`Voir le détail de la vente n° ${v.id}`}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
-                      >
-                        <Eye size={16} aria-hidden="true" />
-                        Détail
-                      </button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTicketId(v.id)}
+                          aria-label={`Imprimer le ticket de la vente n° ${v.id}`}
+                          className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
+                        >
+                          <Receipt size={16} aria-hidden="true" />
+                          Ticket
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(v.id)}
+                          aria-label={`Voir le détail de la vente n° ${v.id}`}
+                          className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
+                        >
+                          <Eye size={16} aria-hidden="true" />
+                          Détail
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -357,11 +388,11 @@ export default function Ventes() {
           detail.data ? (
             <Button
               className="w-full"
-              onClick={() => setReprint(detail.data)}
+              onClick={() => setTicketId(detail.data.id)}
               disabled={detail.isPending}
             >
               <Receipt size={16} aria-hidden="true" />
-              Réimprimer le ticket
+              Imprimer le ticket
             </Button>
           ) : null
         }
@@ -430,9 +461,6 @@ export default function Ventes() {
           </div>
         ) : null}
       </Drawer>
-
-      {/* Réimpression */}
-      <Ticket vente={reprint} boutique={boutique} open={Boolean(reprint)} onClose={() => setReprint(null)} />
     </div>
   )
 }

@@ -201,6 +201,9 @@ export default function Caisse() {
         </p>
       </div>
 
+      {/* Ticket de la vente validée — affiché en ligne (aucune popup) */}
+      <Ticket vente={ticket} boutique={boutique} onFermer={() => setTicket(null)} />
+
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* ── Catalogue ─────────────────────────────────────── */}
         <div className="space-y-3">
@@ -584,8 +587,6 @@ export default function Caisse() {
           </div>
         </aside>
       </div>
-
-      <Ticket vente={ticket} boutique={boutique} open={Boolean(ticket)} onClose={() => setTicket(null)} />
     </div>
   )
 }
