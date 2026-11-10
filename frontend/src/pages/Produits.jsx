@@ -4,6 +4,7 @@
  * badges stock bas / rupture, CRUD en modal, suppression confirmée.
  */
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Package, PackagePlus, Pencil, Plus, Search, Tags, Trash2 } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
@@ -46,6 +47,16 @@ export default function Produits() {
   const [managerOpen, setManagerOpen] = useState(false)
 
   const debouncedSearch = useDebounce(search, 250)
+  const location = useLocation()
+
+  // Le filtre « stock critique » peut être poussé par la barre de messages
+  // (/produits?stock_bas=true) : on resynchronise l'état à chaque changement d'URL.
+  useEffect(() => {
+    setStockBas(new URLSearchParams(location.search).get('stock_bas') === 'true')
+    setPage(1)
+  }, [location.search])
+
+
   const categories = useCategories()
   const params = useMemo(
     () => ({
