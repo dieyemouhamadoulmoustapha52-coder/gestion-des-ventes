@@ -5,9 +5,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createCategory, deleteCategory, listCategories, updateCategory } from '../api/categories.js'
 import { createProduit, deleteProduit, listProduits, updateProduit } from '../api/produits.js'
-import { creerVente, getVente, listVentes } from '../api/ventes.js'
+import { creerVente, getVente, listVentes, listVentesDetaillees } from '../api/ventes.js'
 import { getRapportJour, getTableauDeBord } from '../api/rapports.js'
 import { reapprovisionnerProduit } from '../api/produits.js'
+import { dateDakar, decaleJours } from '../lib/dates.js'
 
 // ── Queries ─────────────────────────────────────────────────────
 
@@ -67,6 +68,21 @@ export function useVente(id) {
     queryKey: ['ventes', 'detail', id],
     queryFn: () => getVente(id),
     enabled: id !== null && id !== undefined,
+  })
+}
+
+/**
+ * Ventes des 30 derniers jours AVEC leurs lignes (plus vendus de la caisse).
+ * @audience caissier
+ * @returns {import('@tanstack/react-query').UseQueryResult<import('../api/types.js').VenteComplete[]>}
+ */
+export function useVentes30Jours() {
+  const au = dateDakar()
+  const du = decaleJours(au, -29)
+  return useQuery({
+    queryKey: ['ventes', 'periode', du, au, 'lignes'],
+    queryFn: () => listVentesDetaillees({ date_debut: du, date_fin: au }),
+    staleTime: 120_000,
   })
 }
 

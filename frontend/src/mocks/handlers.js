@@ -25,14 +25,15 @@ const noContent = async () => {
   return new HttpResponse(null, { status: 204 })
 }
 
-/** Enveloppe de pagination DRF (page_size = 10). */
+/** Enveloppe de pagination DRF (page_size par défaut 10, options 10/25/50). */
 function paginate(list, request) {
   const u = new URL(request.url)
   const page = Math.max(1, parseInt(u.searchParams.get('page') || '1', 10) || 1)
-  const size = 10
+  const brut = parseInt(u.searchParams.get('page_size') || '10', 10)
+  const size = [10, 25, 50].includes(brut) ? brut : 10
   const count = list.length
   const start = (page - 1) * size
-  const href = (p) => `${u.origin}${u.pathname}?page=${p}`
+  const href = (p) => `${u.origin}${u.pathname}?page=${p}&page_size=${size}`
   return {
     count,
     next: start + size < count ? href(page + 1) : null,
@@ -264,10 +265,22 @@ export const handlers = [
   http.get('*/api/ventes/', ({ request }) => {
     const u = new URL(request.url)
     const date = u.searchParams.get('date')
+    const debut = u.searchParams.get('date_debut')
+    const fin = u.searchParams.get('date_fin')
+    const produit = u.searchParams.get('produit')
     const mode = u.searchParams.get('mode_paiement')
 
     let list = [...db.state.ventes].sort((a, b) => b.date_vente.localeCompare(a.date_vente))
     if (date) list = list.filter((v) => v.date_vente.slice(0, 10) === date)
+    if (debut) list = list.filter((v) => v.date_vente.slice(0, 10) >= debut)
+    if (fin) list = list.filter((v) => v.date_vente.slice(0, 10) <= fin)
+    if (produit) {
+      const pid = Number(produit)
+      const idsVentes = new Set(
+        db.state.lignes.filter((l) => l.produit === pid).map((l) => l.vente),
+      )
+      list = list.filter((v) => idsVentes.has(v.id))
+    }
     if (mode) list = list.filter((v) => v.mode_paiement === mode)
     return ok(paginate(list.map(db.serializeVente), request))
   }),

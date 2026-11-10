@@ -17,9 +17,9 @@ import { isStockError } from '../api/client.js'
 import { useBoutique } from '../config/boutique.js'
 import { useCart } from '../context/CartContext.jsx'
 import { useMessages } from '../context/MessagesContext.jsx'
-import { useCategories, useCreerVente, useProduitsGrille } from '../hooks/queries.js'
+import { useCategories, useCreerVente, useProduitsGrille, useVentes30Jours } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
-import { calculerMonnaie, filtrerProduits } from '../lib/caisse.js'
+import { calculerMonnaie, filtrerProduits, topVendus } from '../lib/caisse.js'
 import { formatFcfa, toNumber } from '../lib/money.js'
 
 /** Billets rapides proposés au caissier (FCFA). */
@@ -65,6 +65,14 @@ export default function Caisse() {
     [enCategorie, search],
   )
   const catList = categories.data?.results ?? []
+
+  // Les plus vendus : top 8 des 30 derniers jours, en un clic (si historique).
+  const ventes30 = useVentes30Jours()
+  const plusVendus = useMemo(() => {
+    const rangs = topVendus(ventes30.data ?? [], 8)
+    const parId = new Map(catalogue.map((p) => [p.id, p]))
+    return rangs.map((r) => parId.get(r.produit)).filter(Boolean)
+  }, [ventes30.data, catalogue])
 
   // Monnaie à rendre — affichage + ticket uniquement (jamais dans le corps d'API).
   const monnaie = calculerMonnaie(cart.total, montantRecu)
@@ -189,6 +197,37 @@ export default function Caisse() {
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* ── Catalogue ─────────────────────────────────────── */}
         <div className="space-y-3">
+          {plusVendus.length > 0 ? (
+            <section aria-label="Les plus vendus (30 derniers jours)">
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Les plus vendus
+              </h2>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {plusVendus.map((p) => {
+                  const rupture = p.stock <= 0
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      disabled={rupture}
+                      onClick={() => addToCart(p)}
+                      aria-label={`Ajouter ${p.nom} au panier`}
+                      className="flex min-w-40 shrink-0 flex-col gap-0.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <span className="truncate text-xs font-medium text-slate-500">{p.nom}</span>
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-blue-700">
+                          {formatFcfa(p.prix_unitaire)}
+                        </span>
+                        {rupture ? <Badge tone="red">Rupture</Badge> : null}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          ) : null}
+
           <div className="relative">
             <label htmlFor="caisse-search" className="sr-only">
               Rechercher un produit
