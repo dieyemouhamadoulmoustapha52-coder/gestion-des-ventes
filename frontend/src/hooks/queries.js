@@ -105,6 +105,16 @@ export function useVente(id) {
 export function useVentes30Jours() {
   const au = dateDakar()
   const du = decaleJours(au, -29)
+  return useVentesPeriode(du, au)
+}
+
+/**
+ * Ventes d'une période [du, au] AVEC leurs lignes (rapport mensuel).
+ * @audience patron
+ * @param {string} du 'YYYY-MM-DD' @param {string} au 'YYYY-MM-DD'
+ * @returns {import('@tanstack/react-query').UseQueryResult<import('../api/types.js').VenteComplete[]>}
+ */
+export function useVentesPeriode(du, au) {
   return useQuery({
     queryKey: ['ventes', 'periode', du, au, 'lignes'],
     queryFn: () => listVentesDetaillees({ date_debut: du, date_fin: au }),

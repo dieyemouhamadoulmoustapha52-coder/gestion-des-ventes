@@ -8,6 +8,7 @@ import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
+import RapportMensuel from '../components/RapportMensuel.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useRapport } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
@@ -271,6 +272,9 @@ export default function Rapport() {
           </div>
         </>
       ) : null}
+
+      {/* Rapport mensuel — indépendant de la date choisie (@audience patron) */}
+      <RapportMensuel />
     </div>
   )
 }
