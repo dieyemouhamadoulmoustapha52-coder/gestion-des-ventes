@@ -66,13 +66,20 @@ export default function Caisse() {
   )
   const catList = categories.data?.results ?? []
 
-  // Les plus vendus : top 8 des 30 derniers jours, en un clic (si historique).
+  // Les plus vendus : top 8 des 30 derniers jours — remontés en tête DE LA GRILLE
+  // avec une mise en avant (pas de section à part).
   const ventes30 = useVentes30Jours()
-  const plusVendus = useMemo(() => {
-    const rangs = topVendus(ventes30.data ?? [], 8)
-    const parId = new Map(catalogue.map((p) => [p.id, p]))
-    return rangs.map((r) => parId.get(r.produit)).filter(Boolean)
-  }, [ventes30.data, catalogue])
+  const topIds = useMemo(
+    () => topVendus(ventes30.data ?? [], 8).map((r) => r.produit),
+    [ventes30.data],
+  )
+  const grille = useMemo(() => {
+    if (topIds.length === 0) return list
+    const parId = new Map(list.map((p) => [p.id, p]))
+    const enTete = topIds.map((id) => parId.get(id)).filter(Boolean)
+    const idsVus = new Set(topIds)
+    return [...enTete, ...list.filter((p) => !idsVus.has(p.id))]
+  }, [list, topIds])
 
   // Monnaie à rendre — affichage + ticket uniquement (jamais dans le corps d'API).
   const monnaie = calculerMonnaie(cart.total, montantRecu)
@@ -197,37 +204,6 @@ export default function Caisse() {
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         {/* ── Catalogue ─────────────────────────────────────── */}
         <div className="space-y-3">
-          {plusVendus.length > 0 ? (
-            <section aria-label="Les plus vendus (30 derniers jours)">
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Les plus vendus
-              </h2>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {plusVendus.map((p) => {
-                  const rupture = p.stock <= 0
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      disabled={rupture}
-                      onClick={() => addToCart(p)}
-                      aria-label={`Ajouter ${p.nom} au panier`}
-                      className="flex min-w-40 shrink-0 flex-col gap-0.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-blue-300 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <span className="truncate text-xs font-medium text-slate-500">{p.nom}</span>
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-blue-700">
-                          {formatFcfa(p.prix_unitaire)}
-                        </span>
-                        {rupture ? <Badge tone="red">Rupture</Badge> : null}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-          ) : null}
-
           <div className="relative">
             <label htmlFor="caisse-search" className="sr-only">
               Rechercher un produit
@@ -344,7 +320,7 @@ export default function Caisse() {
                 <Skeleton key={i} className="h-28" />
               ))}
             </div>
-          ) : list.length === 0 ? (
+          ) : grille.length === 0 ? (
             <EmptyState
               icon={Package}
               title="Aucun produit"
@@ -352,7 +328,7 @@ export default function Caisse() {
             />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-              {list.map((p) => {
+              {grille.map((p) => {
                 const rupture = p.stock === 0
                 return (
                   <button
