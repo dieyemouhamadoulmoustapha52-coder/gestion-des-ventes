@@ -10,6 +10,7 @@ export const DEFAULT_BOUTIQUE = {
   reseaux: '@waguebussness',
   caissier: 'Caisse principale',
   devise: 'Satisfaction de nos clients',
+  seuilStockBas: 5, // seuil par défaut si le produit n'a pas de seuil_alerte
 }
 
 const BoutiqueContext = createContext(DEFAULT_BOUTIQUE)

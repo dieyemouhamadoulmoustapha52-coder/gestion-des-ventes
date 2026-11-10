@@ -7,6 +7,7 @@ import { ToastProvider } from './components/Toast.jsx'
 import PageTransition from './components/PageTransition.jsx'
 import { BoutiqueProvider } from './config/boutique.js'
 import { CartProvider } from './context/CartContext.jsx'
+import { MessagesProvider } from './context/MessagesContext.jsx'
 import Layout from './components/Layout.jsx'
 
 const Accueil = lazy(() => import('./pages/Accueil.jsx'))
@@ -25,24 +26,26 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BoutiqueProvider>
-        <ToastProvider>
-          <CartProvider>
-            <BrowserRouter>
-              <Routes>
-                <Route element={<Layout />}>
-                  <Route index element={<PageTransition><Accueil /></PageTransition>} />
-                  <Route path="/" element={<PageTransition><Accueil /></PageTransition>} />
-                  <Route path="/accueil" element={<PageTransition><Accueil /></PageTransition>} />
-                  <Route path="/caisse" element={<PageTransition><Caisse /></PageTransition>} />
-                  <Route path="/produits" element={<PageTransition><Produits /></PageTransition>} />
-                  <Route path="/ventes" element={<PageTransition><Ventes /></PageTransition>} />
-                  <Route path="/rapport" element={<PageTransition><Rapport /></PageTransition>} />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Route>
-              </Routes>
-            </BrowserRouter>
-          </CartProvider>
-        </ToastProvider>
+        <MessagesProvider>
+          <ToastProvider>
+            <CartProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route element={<Layout />}>
+                    <Route index element={<PageTransition><Accueil /></PageTransition>} />
+                    <Route path="/" element={<PageTransition><Accueil /></PageTransition>} />
+                    <Route path="/accueil" element={<PageTransition><Accueil /></PageTransition>} />
+                    <Route path="/caisse" element={<PageTransition><Caisse /></PageTransition>} />
+                    <Route path="/produits" element={<PageTransition><Produits /></PageTransition>} />
+                    <Route path="/ventes" element={<PageTransition><Ventes /></PageTransition>} />
+                    <Route path="/rapport" element={<PageTransition><Rapport /></PageTransition>} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Route>
+                </Routes>
+              </BrowserRouter>
+            </CartProvider>
+          </ToastProvider>
+        </MessagesProvider>
       </BoutiqueProvider>
     </QueryClientProvider>
   )
