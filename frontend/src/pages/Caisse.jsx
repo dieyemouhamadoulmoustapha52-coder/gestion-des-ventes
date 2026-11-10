@@ -4,7 +4,7 @@
  * panier (useReducer via contexte) ; encaissement ; ticket imprimable 80 mm.
  * Raccourcis : / recherche · Entrée ajoute le 1er résultat · Ctrl+Entrée valide.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useDeferredValue, useMemo, useRef, useState } from 'react'
 import { Minus, Package, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
@@ -19,37 +19,51 @@ import { useCart } from '../context/CartContext.jsx'
 import { useMessages } from '../context/MessagesContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
-import { calculerMonnaie } from '../lib/caisse.js'
+import { calculerMonnaie, filtrerProduits } from '../lib/caisse.js'
 import { formatFcfa, toNumber } from '../lib/money.js'
-import { useDebounce } from '../lib/useDebounce.js'
 
 /** Billets rapides proposés au caissier (FCFA). */
 const BILLETS = [500, 1000, 2000, 5000, 10000]
 
+/** Nombre max de résultats surlignables dans la liste rapide. */
+const MAX_RESULTATS = 8
+
 export default function Caisse() {
   const [search, setSearch] = useState('')
+  const [highlight, setHighlight] = useState(0)
   const [categorie, setCategorie] = useState('')
   const [mode, setMode] = useState('ESPECES')
   const [montantRecu, setMontantRecu] = useState('') // saisie caissier, jamais envoyée à l'API
   const [lineError, setLineError] = useState(null) // {produit, stock_disponible}
   const [ticket, setTicket] = useState(null)
 
-  const debouncedSearch = useDebounce(search, 250)
   const searchRef = useRef(null)
   const submitRef = useRef(() => {})
 
   const categories = useCategories()
-  const produits = useProduitsGrille({
-    search: debouncedSearch || undefined,
-    categorie: categorie || undefined,
-  })
+  const produits = useProduitsGrille({}) // catalogue complet : filtrage local (pas de debounce)
   const cart = useCart()
   const boutique = useBoutique()
   const creer = useCreerVente()
   const toast = useToast()
   const { notifyVente } = useMessages()
 
-  const list = useMemo(() => produits.data?.results ?? [], [produits.data])
+  const catalogue = produits.data?.results ?? []
+  const enCategorie = useMemo(
+    () => (categorie ? catalogue.filter((p) => String(p.categorie) === categorie) : catalogue),
+    [catalogue, categorie],
+  )
+  // Rendu du filtre en différé (reactivité), recalcul SYNCHRONE à Entrée.
+  const termeDiffere = useDeferredValue(search)
+  const list = useMemo(
+    () => (termeDiffere.trim() ? filtrerProduits(enCategorie, termeDiffere) : enCategorie),
+    [enCategorie, termeDiffere],
+  )
+  // Liste rapide surlignable : calculée sur la valeur courante (jamais périmée).
+  const resultats = useMemo(
+    () => (search.trim() ? filtrerProduits(enCategorie, search).slice(0, MAX_RESULTATS) : []),
+    [enCategorie, search],
+  )
   const catList = categories.data?.results ?? []
 
   // Monnaie à rendre — affichage + ticket uniquement (jamais dans le corps d'API).
@@ -120,6 +134,10 @@ export default function Caisse() {
         e.preventDefault()
         searchRef.current?.focus()
       }
+      if (e.key === 'F2') {
+        e.preventDefault()
+        submitRef.current()
+      }
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault()
         submitRef.current()
@@ -137,8 +155,19 @@ export default function Caisse() {
   const onSearchKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      const first = list[0]
-      if (first) addToCart(first)
+      // Calcul synchrone sur la valeur courante : pas de résultat périmé.
+      const synchrones = search.trim() ? filtrerProduits(enCategorie, search) : []
+      const cible = synchrones[Math.min(highlight, synchrones.length - 1)]
+      if (cible) addToCart(cible)
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setHighlight((h) => Math.min(h + 1, Math.max(0, resultats.length - 1)))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setHighlight((h) => Math.max(h - 1, 0))
+    } else if (e.key === 'Escape') {
+      setSearch('')
+      setHighlight(0)
     }
   }
 
@@ -151,7 +180,8 @@ export default function Caisse() {
         </div>
         <p className="hidden rounded-lg bg-white px-3 py-2 text-xs text-slate-500 ring-1 ring-slate-200 sm:block">
           <kbd className="font-mono">/</kbd> recherche · <kbd className="font-mono">Entrée</kbd>{' '}
-          ajoute · <kbd className="font-mono">Ctrl+Entrée</kbd> valide
+          ajoute · <kbd className="font-mono">F2</kbd> encaisse ·{' '}
+          <kbd className="font-mono">Ctrl+Entrée</kbd> valide
         </p>
       </div>
 
@@ -173,12 +203,68 @@ export default function Caisse() {
               type="search"
               autoFocus
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setHighlight(0)
+              }}
               onKeyDown={onSearchKeyDown}
-              placeholder="Rechercher un produit… (puis Entrée pour ajouter)"
+              placeholder="Rechercher un produit… (nom ou référence)"
+              role="combobox"
+              aria-expanded={resultats.length > 0}
+              aria-controls="caisse-resultats"
+              aria-activedescendant={resultats.length > 0 ? `caisse-res-${highlight}` : undefined}
+              aria-autocomplete="list"
               className="h-12 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-3 text-sm shadow-sm"
             />
           </div>
+
+          {/* Résultats rapides navigables (↑/↓, Entrée ajoute) */}
+          {resultats.length > 0 ? (
+            <ul
+              id="caisse-resultats"
+              role="listbox"
+              aria-label="Résultats de recherche"
+              className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            >
+              {resultats.map((p, i) => {
+                const rupture = p.stock <= 0
+                return (
+                  <li
+                    key={p.id}
+                    id={`caisse-res-${i}`}
+                    role="option"
+                    aria-selected={i === highlight}
+                    aria-disabled={rupture || undefined}
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => !rupture && addToCart(p)}
+                    className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm ${
+                      i === highlight ? 'bg-blue-50' : ''
+                    } ${rupture ? 'cursor-not-allowed opacity-60' : ''}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-slate-900">{p.nom}</span>
+                      <span className="font-mono text-xs text-slate-400">{p.code}</span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {rupture ? <Badge tone="red">Rupture</Badge> : null}
+                      <span className="font-semibold text-slate-900">{formatFcfa(p.prix_unitaire)}</span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+
+          <p className="text-xs text-slate-500">
+            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">↑</kbd>
+            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">↓</kbd>{' '}
+            naviguer ·{' '}
+            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Entrée</kbd>{' '}
+            ajoute · <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">F2</kbd>{' '}
+            encaisse ·{' '}
+            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Échap</kbd>{' '}
+            efface
+          </p>
 
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par catégorie">
             <button
