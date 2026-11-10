@@ -1,0 +1,46 @@
+# ============================================================
+#  .gitignore frontend/ — React + Vite
+#  Redondant volontairement avec la racine (défense en profondeur).
+# ============================================================
+
+# Environnements (le .env.example reste versionné)
+.env
+.env.*
+!.env.example
+
+# Dépendances & build
+node_modules/
+dist/
+build/
+.vite/
+.cache/
+coverage/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Bases de données locales / exports
+*.sqlite3
+*.sqlite
+*.db
+*.dump
+*.sql.gz
+
+# Documents binaires
+*.pptx
+*.ppt
+*.pdf
+*.docx
+
+# Clés & secrets
+*.pem
+*.key
+secrets/
+secrets.json
+
+# Éditeurs / système
+.DS_Store
+.idea/
+.vscode/

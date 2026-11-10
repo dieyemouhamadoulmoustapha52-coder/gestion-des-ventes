@@ -1,0 +1,54 @@
+# ============================================================
+#  .gitignore backend/ — Django + Python
+#  Redondant volontairement avec la racine (défense en profondeur).
+# ============================================================
+
+# Environnements (le .env.example reste versionné)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Bases de données locales
+*.sqlite3
+*.sqlite
+*.db
+*.dump
+*.sql.gz
+
+# Django
+*.log
+logs/
+staticfiles/
+media/
+htmlcov/
+.coverage
+
+# Qualité
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Documents binaires
+*.pptx
+*.ppt
+*.pdf
+*.docx
+
+# Clés & secrets
+*.pem
+*.key
+secrets/
+secrets.json
+
+# Éditeurs / système
+.DS_Store
+.idea/
+.vscode/
