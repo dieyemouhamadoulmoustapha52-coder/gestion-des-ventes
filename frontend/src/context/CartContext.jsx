@@ -1,55 +1,23 @@
 /**
- * Panier de caisse — useReducer + contexte.
+ * Paniers de caisse — useReducer (reducer pur dans lib/paniers.js) + contexte.
  * Le panier vit AU-DESSUS du routage : il survit aux changements de page.
+ * @audience caissier
  */
 import { createContext, useContext, useMemo, useReducer } from 'react'
+import { paniersEtatInitial, paniersReducer } from '../lib/paniers.js'
 
 const CartContext = createContext(null)
 
-/**
- * État : liste de {produit, quantite}.
- * `produit` = snapshot Produit (id, nom, prix_unitaire, stock).
- */
-function reducer(items, action) {
-  switch (action.type) {
-    case 'add': {
-      const { produit } = action
-      if (produit.stock <= 0) return items
-      const existing = items.find((i) => i.produit.id === produit.id)
-      if (existing) {
-        return items.map((i) =>
-          i.produit.id === produit.id
-            ? { ...i, quantite: Math.min(i.quantite + 1, produit.stock), produit }
-            : i,
-        )
-      }
-      return [...items, { produit, quantite: 1 }]
-    }
-    case 'inc':
-      return items.map((i) =>
-        i.produit.id === action.id
-          ? { ...i, quantite: Math.min(i.quantite + 1, i.produit.stock) }
-          : i,
-      )
-    case 'dec':
-      return items.map((i) =>
-        i.produit.id === action.id ? { ...i, quantite: Math.max(1, i.quantite - 1) } : i,
-      )
-    case 'remove':
-      return items.filter((i) => i.produit.id !== action.id)
-    case 'clear':
-      return []
-    default:
-      return items
-  }
-}
-
+/** @param {{children: React.ReactNode}} props */
 export function CartProvider({ children }) {
-  const [items, dispatch] = useReducer(reducer, [])
+  const [state, dispatch] = useReducer(paniersReducer, undefined, paniersEtatInitial)
 
   const value = useMemo(() => {
+    const courant = state.paniers[state.actif] ?? state.paniers[0]
+    const items = courant.items
     const count = items.reduce((s, i) => s + i.quantite, 0)
     const total = items.reduce((s, i) => s + i.produit.prix_unitaire * i.quantite, 0)
+    const lignes = (p) => p.items.reduce((s, i) => s + i.quantite, 0)
     return {
       items,
       count,
@@ -58,14 +26,29 @@ export function CartProvider({ children }) {
       inc: (id) => dispatch({ type: 'inc', id }),
       dec: (id) => dispatch({ type: 'dec', id }),
       remove: (id) => dispatch({ type: 'remove', id }),
-      clear: () => dispatch({ type: 'clear' }),
+      // La vente validée ne vide QUE son panier (id = panier vendu).
+      clear: (id) => dispatch({ type: 'clear', id }),
+      vendu: (id) => dispatch({ type: 'vendu', id }),
+
+      // Onglets « Panier 1…5 »
+      paniers: state.paniers.map((p, i) => ({
+        id: p.id,
+        actif: i === state.actif,
+        count: lignes(p),
+        vide: p.items.length === 0,
+      })),
+      actifId: courant.id,
+      activer: (index) => dispatch({ type: 'activer', id: index }),
+      ajouterPanier: () => dispatch({ type: 'ajouter' }),
+      fermerPanier: (id) => dispatch({ type: 'fermer', id }),
+      hydrater: (etat) => dispatch({ type: 'hydrate', state: etat }),
     }
-  }, [items])
+  }, [state])
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }
 
-/** @returns {ReturnType<typeof CartProvider> extends never ? never : any} */
+/** @returns {any} contexte panier (cf. CartProvider) */
 export function useCart() {
   const ctx = useContext(CartContext)
   if (!ctx) throw new Error('useCart doit être utilisé dans <CartProvider>')

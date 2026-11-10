@@ -88,6 +88,7 @@ export default function Caisse() {
   const validate = () => {
     if (cart.items.length === 0 || creer.isPending || monnaieBloquante) return
     setLineError(null)
+    const panierVenduId = cart.actifId // la vente ne réinitialise QUE ce panier
     creer.mutate(
       {
         mode_paiement: mode,
@@ -103,7 +104,7 @@ export default function Caisse() {
               ? { montant_recu: toNumber(montantRecu), monnaie_rendue: monnaie.monnaie }
               : {}),
           })
-          cart.clear()
+          cart.vendu(panierVenduId)
           setMontantRecu('')
         },
         onError: (err) => {
@@ -351,6 +352,54 @@ export default function Caisse() {
         {/* ── Panier ────────────────────────────────────────── */}
         <aside aria-label="Panier" className="lg:sticky lg:top-4 lg:self-start">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+            {/* Onglets « Panier 1…5 » — jusqu'à 5 paniers en attente */}
+            <div
+              role="tablist"
+              aria-label="Paniers en attente"
+              className="flex flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-2"
+            >
+              {cart.paniers.map((p, i) => (
+                <span
+                  key={p.id}
+                  className={`flex items-center rounded-lg border ${
+                    p.actif ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={p.actif}
+                    onClick={() => cart.activer(i)}
+                    className={`min-h-9 rounded-lg px-2.5 text-xs font-medium ${
+                      p.actif ? 'text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Panier {i + 1}
+                    {p.count ? <span className="ml-1 font-bold">({p.count})</span> : null}
+                  </button>
+                  {p.vide && cart.paniers.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => cart.fermerPanier(p.id)}
+                      aria-label={`Fermer Panier ${i + 1}`}
+                      className="flex h-9 w-8 items-center justify-center rounded-r-lg text-slate-400 hover:text-slate-700"
+                    >
+                      ×
+                    </button>
+                  ) : null}
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={cart.ajouterPanier}
+                disabled={cart.paniers.length >= 5}
+                aria-label="Nouveau panier en attente"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-dashed border-slate-300 text-sm font-bold text-slate-500 hover:border-slate-400 hover:text-slate-700 disabled:opacity-40"
+              >
+                +
+              </button>
+            </div>
+
             <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                 <ShoppingCart size={18} aria-hidden="true" />
