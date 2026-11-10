@@ -71,7 +71,7 @@ export default function Caisse() {
       },
       {
         onSuccess: (vente) => {
-          toast.success(`Vente n° ${vente.id} encaissée — ${formatFcfa(vente.montant_total)}.`)
+          // Pas de toast : le succès de vente est porté par la barre de messages.
           notifyVente(formatFcfa(vente.montant_total))
           setTicket(vente)
           cart.clear()
