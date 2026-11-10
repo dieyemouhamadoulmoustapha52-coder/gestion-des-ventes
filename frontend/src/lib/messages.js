@@ -26,6 +26,9 @@ export const PRIORITE = { critique: 0, avertissement: 1, succes: 2, info: 3 }
 /** Durée d'affichage d'un message éphémère (ms). */
 export const DUREE_EPHEMERE = 4000
 
+/** Durée d'affichage d'un message avant passage au suivant (ms). */
+export const DUREE_ROTATION = 6000
+
 /** Seuil de regroupement : au-delà, un seul message groupé. */
 export const SEUIL_GROUPEMENT = 3
 

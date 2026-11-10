@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { useMessages } from '../context/MessagesContext.jsx'
-import { DUREE_EPHEMERE } from '../lib/messages.js'
+import { DUREE_EPHEMERE, DUREE_ROTATION } from '../lib/messages.js'
 
 /** Niveau → icône + libellé textuel (la couleur seule ne suffit jamais). */
 const NIVEAUX = {
@@ -38,6 +38,7 @@ export default function MessageBar() {
   const current = messages[index] ?? null
   const niveau = current ? NIVEAUX[current.niveau] : null
   const ephemere = messages.find((m) => m.ephemere) ?? null
+  const total = messages.length
 
   // Décompte du message éphémère : 4 s, en pause au survol et au focus.
   // Indépendant de l'index : le décompte continue même si l'on navigue ailleurs.
@@ -59,7 +60,16 @@ export default function MessageBar() {
     if (messages.length === 0) setExpanded(false)
   }, [messages.length])
 
-  const total = messages.length
+  // Défilement automatique : chaque message reste DUREE_ROTATION ms puis
+  // on passe au suivant (boucle). En pause au survol/focus, quand le panneau
+  // est ouvert et pendant un message éphémère (qui a son propre décompte).
+  const dureeRotation = current?.duree ?? DUREE_ROTATION
+  useEffect(() => {
+    if (total <= 1 || pause || expanded || ephemere) return
+    const timer = setTimeout(() => setIndex((index + 1) % total), dureeRotation)
+    return () => clearTimeout(timer)
+  }, [index, total, pause, expanded, ephemere, setIndex, dureeRotation])
+
   const critique = current?.niveau === 'critique'
 
   const onKeyDown = (e) => {
@@ -79,8 +89,14 @@ export default function MessageBar() {
 
   return (
     <div
-      className="border-b border-[var(--border)] bg-[var(--surface)]"
-      style={{ borderLeft: `4px solid ${couleur}` }}
+      className="border-b-2 border-[var(--border)] bg-[var(--surface-alt)]"
+      style={{
+        // Fond teinté au niveau du message (repli : --surface-alt si
+        // color-mix indisponible) + liseré fort à gauche.
+        backgroundColor: `color-mix(in srgb, ${couleur} 15%, var(--surface))`,
+        borderBottomColor: `color-mix(in srgb, ${couleur} 50%, var(--border))`,
+        borderLeft: `5px solid ${couleur}`,
+      }}
       role={critique ? 'alert' : 'status'}
       aria-live={critique ? undefined : 'polite'}
       onMouseEnter={() => setPause(true)}
@@ -91,14 +107,22 @@ export default function MessageBar() {
       }}
       onKeyDown={onKeyDown}
     >
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
-        <Icon size={18} className="shrink-0" style={{ color: couleur }} aria-hidden="true" />
-        <p className="min-w-0 flex-1 basis-48 truncate text-sm font-medium text-[var(--text)]">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
+        <span
+          className="inline-flex shrink-0 items-center justify-center rounded-full p-1.5"
+          style={{ backgroundColor: `color-mix(in srgb, ${couleur} 25%, var(--surface))` }}
+        >
+          <Icon size={17} style={{ color: couleur }} aria-hidden="true" />
+        </span>
+        <p className="min-w-0 flex-1 basis-48 truncate text-sm font-semibold text-[var(--text)]">
           {current.texte}
         </p>
         <span
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold text-[var(--text)]"
-          style={{ borderColor: couleur }}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold text-[var(--text)]"
+          style={{
+            backgroundColor: `color-mix(in srgb, ${couleur} 22%, var(--surface))`,
+            borderColor: couleur,
+          }}
         >
           {label}
         </span>
