@@ -43,7 +43,7 @@ export function ToastProvider({ children }) {
             className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-xl px-4 py-3 shadow-lg ring-1 ${
               t.type === 'error'
                 ? 'bg-red-600 text-white ring-red-700'
-                : 'bg-emerald-600 text-white ring-emerald-700'
+                : 'bg-emerald-700 text-white ring-emerald-700'
             }`}
           >
             {t.type === 'error' ? (

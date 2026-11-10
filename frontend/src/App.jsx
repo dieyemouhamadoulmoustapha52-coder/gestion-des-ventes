@@ -1,5 +1,5 @@
 
-/** Routage applicatif — pages lazy (React.lazy + Suspense dans Layout). */
+/** Routage applicatif — Caisse eager (bundle initial), autres écrans lazy. */
 import { lazy } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -9,9 +9,10 @@ import { BoutiqueProvider } from './config/boutique.js'
 import { CartProvider } from './context/CartContext.jsx'
 import { MessagesProvider } from './context/MessagesContext.jsx'
 import Layout from './components/Layout.jsx'
+// Écran d'accueil caisse : chargé directement (jamais de fallback).
+import Caisse from './pages/Caisse.jsx'
 
 const Accueil = lazy(() => import('./pages/Accueil.jsx'))
-const Caisse = lazy(() => import('./pages/Caisse.jsx'))
 const Produits = lazy(() => import('./pages/Produits.jsx'))
 const Ventes = lazy(() => import('./pages/Ventes.jsx'))
 const Rapport = lazy(() => import('./pages/Rapport.jsx'))

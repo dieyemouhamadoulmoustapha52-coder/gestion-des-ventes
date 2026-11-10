@@ -234,33 +234,33 @@ export default function Accueil() {
           label="CA du jour"
           value={formatFcfa(data.aujourdhui.ca)}
           detail={
-            <span className={`inline-flex items-center gap-1 font-medium ${isUp ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`inline-flex items-center gap-1 font-medium ${isUp ? 'text-emerald-700' : 'text-red-700'}`}>
               {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
               {Math.abs(ecartPct).toFixed(1)}% vs hier
             </span>
           }
-          tone={isUp ? 'text-emerald-600' : 'text-red-600'}
+          tone={isUp ? 'text-emerald-700' : 'text-red-700'}
         />
         <StatCard
           icon={ShoppingBag}
           label="Ventes"
           value={String(data.aujourdhui.nb_ventes)}
           detail="Transactions validées"
-          tone="text-blue-600"
+          tone="text-[var(--primary-ink)]"
         />
         <StatCard
           icon={BarChart3}
           label="Panier moyen"
           value={formatFcfa(data.aujourdhui.panier_moyen)}
           detail="Moyenne par ticket"
-          tone="text-violet-600"
+          tone="text-violet-700"
         />
         <StatCard
           icon={PackageCheck}
           label="Valeur stock"
           value={formatFcfa(data.stock.valeur_stock)}
           detail={`${data.stock.nb_en_alerte} en alerte · ${data.stock.nb_en_rupture} rupture`}
-          tone="text-amber-600"
+          tone="text-amber-700"
         />
       </div>
 
@@ -303,7 +303,7 @@ export default function Accueil() {
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-900">Top 5 semaine</h2>
-            <Link to="/produits" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">
+            <Link to="/produits" className="inline-flex items-center gap-1 text-sm font-medium text-[var(--primary-ink)]">
               Voir catalogue <ArrowRight size={14} />
             </Link>
           </div>
@@ -332,7 +332,7 @@ export default function Accueil() {
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-900">Stock</h2>
-            <Link to="/produits?stock_bas=true" className="text-sm font-medium text-blue-600">
+            <Link to="/produits?stock_bas=true" className="text-sm font-medium text-[var(--primary-ink)]">
               Voir stock bas
             </Link>
           </div>
@@ -355,7 +355,7 @@ export default function Accueil() {
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-900">Dernières ventes</h2>
-            <Link to="/ventes" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600">
+            <Link to="/ventes" className="inline-flex items-center gap-1 text-sm font-medium text-[var(--primary-ink)]">
               Historique <ArrowRight size={14} />
             </Link>
           </div>

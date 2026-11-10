@@ -7,6 +7,7 @@ export const DEFAULT_BOUTIQUE = {
   adresse: 'Dakar, Sénégal',
   telephone: '+221 77 000 00 00',
   message_ticket: 'Merci pour votre achat !',
+  piedTicket: 'Merci de votre visite',
   reseaux: '@waguebussness',
   caissier: 'Caisse principale',
   devise: 'Satisfaction de nos clients',

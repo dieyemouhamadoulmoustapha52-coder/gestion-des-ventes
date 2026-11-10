@@ -1,9 +1,12 @@
 /**
- * Historique des ventes : filtres (date, mode), pagination,
+ * Historique des ventes — @audience patron.
+ * Filtres période (du/au + raccourcis), produit, moyen de paiement ;
+ * reflétés dans l'URL (du, au, produit, mode, page, page_size) ;
+ * pagination DRF (10/25/50), totaux du jeu filtré, export CSV complet ;
  * détail en tiroir, réimpression du ticket.
  */
-import { useMemo, useState } from 'react'
-import { Eye, Receipt } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Download, Eye, Receipt } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import Drawer from '../components/Drawer.jsx'
@@ -12,13 +15,18 @@ import ErrorState from '../components/ErrorState.jsx'
 import Pagination from '../components/Pagination.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import Ticket from '../components/Ticket.jsx'
+import WhatsappIcon from '../components/WhatsappIcon.jsx'
+import { useToast } from '../components/Toast.jsx'
+import { listVentesDetaillees } from '../api/ventes.js'
 import { useBoutique } from '../config/boutique.js'
-import { useVente, useVentes } from '../hooks/queries.js'
+import { useProduitsGrille, useTotauxVentes, useVente, useVentes } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
-import { FUSEAU } from '../lib/dates.js'
+import { dateDakar, decaleJours, FUSEAU } from '../lib/dates.js'
+import { genererCsvVentes, nomFichierCsv, telechargerCsv } from '../lib/exportCsv.js'
 import { formatFcfa } from '../lib/money.js'
+import { useDebouncedValue } from '../lib/useDebounce.js'
+import { buildWhatsAppLink, ouvrirWhatsApp } from '../lib/whatsapp.js'
 
-const PAGE_SIZE = 10
 const DTF = new Intl.DateTimeFormat('fr-FR', {
   timeZone: FUSEAU,
   day: '2-digit',
@@ -33,7 +41,21 @@ const MODE_TONES = {
   ESPECES: 'green',
   WAVE: 'blue',
   ORANGE_MONEY: 'orange',
-  CARTE: 'slate',
+}
+
+/** Lit les filtres depuis l'URL (retour/avant du navigateur compris). */
+function lireFiltres() {
+  const p = new URLSearchParams(window.location.search)
+  const taille = Number(p.get('page_size'))
+  return {
+    search: p.get('search') || '',
+    du: p.get('du') || '',
+    au: p.get('au') || '',
+    produit: p.get('produit') || '',
+    mode: p.get('mode') || '',
+    page: Math.max(1, Number(p.get('page')) || 1),
+    pageSize: [10, 25, 50].includes(taille) ? taille : 10,
+  }
 }
 
 function RowSkeleton() {
@@ -47,28 +69,109 @@ function RowSkeleton() {
 }
 
 export default function Ventes() {
-  const [date, setDate] = useState('')
-  const [mode, setMode] = useState('')
-  const [page, setPage] = useState(1)
+  const [f, setF] = useState(lireFiltres)
+  const [recherche, setRecherche] = useState(f.search)
   const [selectedId, setSelectedId] = useState(null)
-  const [reprint, setReprint] = useState(null)
+  const [ticketId, setTicketId] = useState(null)
+  const [exportEnCours, setExportEnCours] = useState(false)
 
-  const params = useMemo(
-    () => ({ date: date || undefined, mode_paiement: mode || undefined, page }),
-    [date, mode, page],
-  )
-  const ventes = useVentes(params)
-  const detail = useVente(selectedId)
+  const toast = useToast()
   const boutique = useBoutique()
+  const produits = useProduitsGrille({})
+
+  // Recherche texte → URL après 250 ms de silence (jamais à chaque frappe).
+  const rechercheDebouncee = useDebouncedValue(recherche, 250)
+  useEffect(() => {
+    if (rechercheDebouncee !== f.search) {
+      setFiltre({ search: rechercheDebouncee })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rechercheDebouncee])
+
+  // Filtres → URL (remplacement, sans historique parasite).
+  useEffect(() => {
+    const p = new URLSearchParams()
+    if (f.search) p.set('search', f.search)
+    if (f.du) p.set('du', f.du)
+    if (f.au) p.set('au', f.au)
+    if (f.produit) p.set('produit', f.produit)
+    if (f.mode) p.set('mode', f.mode)
+    if (f.page > 1) p.set('page', String(f.page))
+    if (f.pageSize !== 10) p.set('page_size', String(f.pageSize))
+    const next = p.toString() ? `?${p.toString()}` : ''
+    if (window.location.search !== next) {
+      window.history.replaceState({}, '', `${window.location.pathname}${next}`)
+    }
+  }, [f])
+
+  // Retour/avant du navigateur → resynchronisation des filtres.
+  useEffect(() => {
+    const onPop = () => {
+      const suivants = lireFiltres()
+      setF(suivants)
+      setRecherche(suivants.search)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const paramsFiltres = useMemo(
+    () => ({
+      search: f.search || undefined,
+      date_debut: f.du || undefined,
+      date_fin: f.au || undefined,
+      produit: f.produit || undefined,
+      mode_paiement: f.mode || undefined,
+    }),
+    [f.search, f.du, f.au, f.produit, f.mode],
+  )
+
+  const ventes = useVentes({ ...paramsFiltres, page: f.page, page_size: f.pageSize })
+  const totaux = useTotauxVentes(paramsFiltres)
+  const detail = useVente(selectedId)
+  const ticket = useVente(ticketId)
 
   const count = ventes.data?.count ?? 0
-  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
-  const hasFilters = Boolean(date || mode)
+  const totalPages = Math.max(1, Math.ceil(count / f.pageSize))
+  const hasFilters = Boolean(f.search || f.du || f.au || f.produit || f.mode)
+
+  const setFiltre = (patch) => setF((prev) => ({ ...prev, ...patch, page: 1 }))
 
   const resetFilters = () => {
-    setDate('')
-    setMode('')
-    setPage(1)
+    setRecherche('')
+    setF({ search: '', du: '', au: '', produit: '', mode: '', page: 1, pageSize: f.pageSize })
+  }
+
+  // Raccourcis de période (fuseau Dakar).
+  const aujourdhui = dateDakar()
+  const raccourcis = [
+    { label: "Aujourd'hui", du: aujourdhui, au: aujourdhui },
+    { label: '7 jours', du: decaleJours(aujourdhui, -6), au: aujourdhui },
+    {
+      label: 'Ce mois',
+      du: `${aujourdhui.slice(0, 7)}-01`,
+      au: aujourdhui,
+    },
+  ]
+
+  // Export CSV : TOUT le jeu filtré (pas seulement la page courante).
+  const exporter = async () => {
+    setExportEnCours(true)
+    try {
+      const toutes = await listVentesDetaillees(paramsFiltres)
+      if (toutes.length === 0) {
+        toast.error('Aucune vente à exporter avec ces filtres.')
+        return
+      }
+      telechargerCsv(
+        genererCsvVentes(toutes, MODE_LABELS),
+        nomFichierCsv(toutes, f.du || undefined, f.au || undefined),
+      )
+    } catch {
+      toast.error('Export CSV impossible.')
+    } finally {
+      setExportEnCours(false)
+    }
   }
 
   return (
@@ -77,54 +180,141 @@ export default function Ventes() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Historique des ventes</h1>
           <p className="text-sm text-slate-500">
-            {count} vente{count > 1 ? 's' : ''} enregistrée{count > 1 ? 's' : ''}
+            {totaux.data ? totaux.data.count : count} vente
+            {(totaux.data ? totaux.data.count : count) > 1 ? 's' : ''} ·{' '}
+            {formatFcfa(totaux.data?.total ?? 0)}
           </p>
         </div>
+        <Button variant="secondary" onClick={exporter} disabled={exportEnCours}>
+          <Download size={16} aria-hidden="true" />
+          {exportEnCours ? 'Export…' : 'Exporter CSV'}
+        </Button>
       </div>
 
-      {/* Filtres */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div>
-          <label htmlFor="v-date" className="sr-only">
-            Filtrer par date
-          </label>
-          <input
-            id="v-date"
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value)
-              setPage(1)
-            }}
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-48"
+      {/* Ticket de la vente sélectionnée — affiché en ligne (aucune popup) */}
+      {ticketId !== null && ticket.isPending ? (
+        <div className="max-w-sm">
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : ticketId !== null && ticket.isError ? (
+        <div className="max-w-sm">
+          <ErrorState message={ticket.error.detail} onRetry={() => ticket.refetch()} />
+        </div>
+      ) : ticketId !== null && ticket.data ? (
+        <div className="max-w-sm">
+          <Ticket
+            vente={ticket.data}
+            boutique={boutique}
+            onFermer={() => setTicketId(null)}
           />
         </div>
-        <div>
-          <label htmlFor="v-mode" className="sr-only">
-            Filtrer par mode de paiement
-          </label>
-          <select
-            id="v-mode"
-            value={mode}
-            onChange={(e) => {
-              setMode(e.target.value)
-              setPage(1)
-            }}
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-52"
-          >
-            <option value="">Tous les modes</option>
-            {Object.entries(MODE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
+      ) : null}
+
+      {/* Filtres */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-end">
+        <div className="flex flex-wrap gap-2">
+          {raccourcis.map((r) => {
+            const actif = f.du === r.du && f.au === r.au
+            return (
+              <button
+                key={r.label}
+                type="button"
+                aria-pressed={actif}
+                onClick={() => setFiltre(actif && hasFilters ? { du: '', au: '' } : { du: r.du, au: r.au })}
+                className={`min-h-11 rounded-lg border px-3 text-sm font-medium transition ${
+                  actif
+                    ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-contrast)]'
+                    : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {r.label}
+              </button>
+            )
+          })}
         </div>
-        {hasFilters ? (
-          <Button variant="ghost" onClick={resetFilters}>
-            Réinitialiser
-          </Button>
-        ) : null}
+
+        <div className="flex flex-wrap gap-3">
+          <div>
+            <label htmlFor="v-search" className="block text-xs font-medium text-slate-500">
+              Rechercher
+            </label>
+            <input
+              id="v-search"
+              type="search"
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="N° de vente ou client"
+              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-56"
+            />
+          </div>
+          <div>
+            <label htmlFor="v-du" className="block text-xs font-medium text-slate-500">
+              Du
+            </label>
+            <input
+              id="v-du"
+              type="date"
+              value={f.du}
+              max={f.au || undefined}
+              onChange={(e) => setFiltre({ du: e.target.value })}
+              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-44"
+            />
+          </div>
+          <div>
+            <label htmlFor="v-au" className="block text-xs font-medium text-slate-500">
+              Au
+            </label>
+            <input
+              id="v-au"
+              type="date"
+              value={f.au}
+              min={f.du || undefined}
+              onChange={(e) => setFiltre({ au: e.target.value })}
+              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-44"
+            />
+          </div>
+          <div>
+            <label htmlFor="v-produit" className="block text-xs font-medium text-slate-500">
+              Produit
+            </label>
+            <select
+              id="v-produit"
+              value={f.produit}
+              onChange={(e) => setFiltre({ produit: e.target.value })}
+              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-52"
+            >
+              <option value="">Tous les produits</option>
+              {(produits.data?.results ?? []).map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="v-mode" className="block text-xs font-medium text-slate-500">
+              Moyen de paiement
+            </label>
+            <select
+              id="v-mode"
+              value={f.mode}
+              onChange={(e) => setFiltre({ mode: e.target.value })}
+              className="mt-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-48"
+            >
+              <option value="">Tous les modes</option>
+              {Object.entries(MODE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {hasFilters ? (
+            <Button variant="ghost" onClick={resetFilters}>
+              Réinitialiser
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* États */}
@@ -167,7 +357,7 @@ export default function Ventes() {
                   <th scope="col" className="px-4 py-3">Date</th>
                   <th scope="col" className="px-4 py-3">Mode</th>
                   <th scope="col" className="px-4 py-3">Total</th>
-                  <th scope="col" className="px-4 py-3 text-right">Détail</th>
+                  <th scope="col" className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -186,22 +376,40 @@ export default function Ventes() {
                       {formatFcfa(v.montant_total)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedId(v.id)}
-                        aria-label={`Voir le détail de la vente n° ${v.id}`}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
-                      >
-                        <Eye size={16} aria-hidden="true" />
-                        Détail
-                      </button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTicketId(v.id)}
+                          aria-label={`Imprimer le ticket de la vente n° ${v.id}`}
+                          className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
+                        >
+                          <Receipt size={16} aria-hidden="true" />
+                          Ticket
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(v.id)}
+                          aria-label={`Voir le détail de la vente n° ${v.id}`}
+                          className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-[var(--surface-alt)] hover:text-[var(--text)]"
+                        >
+                          <Eye size={16} aria-hidden="true" />
+                          Détail
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination page={page} totalPages={totalPages} count={count} onChange={setPage} />
+          <Pagination
+            page={f.page}
+            totalPages={totalPages}
+            count={count}
+            onChange={(page) => setF((prev) => ({ ...prev, page }))}
+            pageSize={f.pageSize}
+            onPageSizeChange={(pageSize) => setFiltre({ pageSize })}
+          />
         </div>
       )}
 
@@ -212,14 +420,24 @@ export default function Ventes() {
         onClose={() => setSelectedId(null)}
         footer={
           detail.data ? (
-            <Button
-              className="w-full"
-              onClick={() => setReprint(detail.data)}
-              disabled={detail.isPending}
-            >
-              <Receipt size={16} aria-hidden="true" />
-              Réimprimer le ticket
-            </Button>
+            <div className="flex w-full flex-wrap gap-2">
+              <Button
+                className="flex-1"
+                onClick={() => setTicketId(detail.data.id)}
+                disabled={detail.isPending}
+              >
+                <Receipt size={16} aria-hidden="true" />
+                Imprimer le ticket
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => ouvrirWhatsApp(buildWhatsAppLink(detail.data, boutique))}
+              >
+                <WhatsappIcon size={16} />
+                Envoyer par WhatsApp
+              </Button>
+            </div>
           ) : null
         }
       >
@@ -278,18 +496,15 @@ export default function Ventes() {
               </ul>
             </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
-              <span className="text-sm font-medium text-blue-900">Total</span>
-              <span className="text-lg font-bold text-blue-900">
+            <div className="flex items-center justify-between rounded-xl bg-[var(--primary-soft)] px-4 py-3">
+              <span className="text-sm font-medium text-[var(--primary-ink)]">Total</span>
+              <span className="text-lg font-bold text-[var(--primary-ink)]">
                 {formatFcfa(detail.data.montant_total)}
               </span>
             </div>
           </div>
         ) : null}
       </Drawer>
-
-      {/* Réimpression */}
-      <Ticket vente={reprint} boutique={boutique} open={Boolean(reprint)} onClose={() => setReprint(null)} />
     </div>
   )
 }

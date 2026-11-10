@@ -1,15 +1,17 @@
 /**
  * Shell de l'application : barre latérale (≥ 1024 px) / navigation basse
- * (mobile, cibles ≥ 44 px) + Suspense pour les routes lazy.
+ * (mobile, cibles ≥ 44 px) + Suspense pour les routes lazy,
+ * préchargement des écrans au survol/focus et frontière d'erreur.
  */
 import { Suspense, useEffect, useState } from 'react'
 import { BarChart3, Home, Package, Receipt, ShoppingCart } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useBoutique } from '../config/boutique.js'
 import { applyTheme, getStoredTheme, THEME_KEY, THEME_OPTIONS } from '../config/theme.js'
 import DemoBanner from './DemoBanner.jsx'
 import MessageBar from './MessageBar.jsx'
 import PageSkeleton from './PageSkeleton.jsx'
+import ScreenErrorBoundary from './ScreenErrorBoundary.jsx'
 
 const NAV = [
   { to: '/', label: 'Accueil', icon: Home },
@@ -18,6 +20,24 @@ const NAV = [
   { to: '/ventes', label: 'Ventes', icon: Receipt },
   { to: '/rapport', label: 'Rapport', icon: BarChart3 },
 ]
+
+/** Préchargement des chunks lazy au survol/focus d'un lien de navigation. */
+const PREFETCH = {
+  '/': () => import('../pages/Accueil.jsx'),
+  '/accueil': () => import('../pages/Accueil.jsx'),
+  '/caisse': () => import('../pages/Caisse.jsx'),
+  '/produits': () => import('../pages/Produits.jsx'),
+  '/ventes': () => import('../pages/Ventes.jsx'),
+  '/rapport': () => import('../pages/Rapport.jsx'),
+}
+
+function prefetch(to) {
+  try {
+    PREFETCH[to]?.().catch(() => {})
+  } catch {
+    /* prefetch best effort */
+  }
+}
 
 function Brand() {
   const boutique = useBoutique()
@@ -69,6 +89,7 @@ function ThemeSelector() {
 
 export default function Layout() {
   const boutique = useBoutique()
+  const location = useLocation()
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
@@ -81,6 +102,8 @@ export default function Layout() {
             <NavLink
               key={to}
               to={to}
+              onMouseEnter={() => prefetch(to)}
+              onFocus={() => prefetch(to)}
               className={({ isActive }) =>
                 `flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors ${
                   isActive ? 'text-[var(--primary)]' : 'text-[var(--muted)] hover:bg-[var(--surface-alt)]'
@@ -99,6 +122,11 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <div className="border-t border-[var(--border)] p-3">
+          <div className="flex justify-center">
+            <ThemeSelector />
+          </div>
+        </div>
       </aside>
 
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:hidden">
@@ -109,13 +137,12 @@ export default function Layout() {
       <main className="lg:pl-64">
         <MessageBar />
         <div className="mx-auto max-w-6xl px-4 py-6 pb-28 lg:pb-10">
-          <div className="mb-4 flex justify-end">
-            <ThemeSelector />
-          </div>
           <DemoBanner />
-          <Suspense fallback={<PageSkeleton />}>
-            <Outlet />
-          </Suspense>
+          <ScreenErrorBoundary resetKey={location.pathname}>
+            <Suspense fallback={<PageSkeleton />}>
+              <Outlet />
+            </Suspense>
+          </ScreenErrorBoundary>
         </div>
       </main>
 
@@ -128,6 +155,8 @@ export default function Layout() {
             <NavLink
               key={to}
               to={to}
+              onMouseEnter={() => prefetch(to)}
+              onFocus={() => prefetch(to)}
               className={({ isActive }) =>
                 `flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${
                   isActive ? 'text-[var(--primary)]' : 'text-[var(--muted)]'

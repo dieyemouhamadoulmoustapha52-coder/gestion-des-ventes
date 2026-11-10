@@ -8,6 +8,7 @@ import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
+import RapportMensuel from '../components/RapportMensuel.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useRapport } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
@@ -159,7 +160,7 @@ export default function Rapport() {
                       value={e.total}
                       total={data.ca_total}
                       detail={`${e.nb_ventes} vente${e.nb_ventes > 1 ? 's' : ''}`}
-                      tone="bg-blue-600"
+                      tone="bg-[var(--primary)]"
                     />
                   ))}
                 </ul>
@@ -183,7 +184,7 @@ export default function Rapport() {
                       label={c.categorie}
                       value={c.ca}
                       total={data.ca_total}
-                      tone="bg-emerald-600"
+                      tone="bg-[var(--success)]"
                     />
                   ))}
                 </ul>
@@ -271,6 +272,9 @@ export default function Rapport() {
           </div>
         </>
       ) : null}
+
+      {/* Rapport mensuel — indépendant de la date choisie (@audience patron) */}
+      <RapportMensuel />
     </div>
   )
 }

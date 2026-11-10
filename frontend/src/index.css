@@ -8,10 +8,17 @@
   --muted: #475569;
   --border: #dfe7f1;
   --primary: #2563eb;
+  /* Texte SUR fond primaire (AA : blanc sur #2563eb = 5,1:1) */
+  --primary-contrast: #ffffff;
+  /* Texte d'accent (prix, liens) — lisible sur surface ET fond teinté
+     (AA : #1d4ed8 sur blanc = 6,6:1, sur --primary-soft = 5,6:1) */
+  --primary-ink: #1d4ed8;
   --primary-soft: rgba(37, 99, 235, 0.12);
   --success: #16a34a;
   --warning: #d97706;
   --danger: #dc2626;
+  /* Texte SUR fond danger (AA : blanc sur #dc2626 = 4,8:1) */
+  --danger-contrast: #ffffff;
   --shadow: rgba(15, 23, 42, 0.08);
   --motion-duration: 180ms;
   --motion-duration-fast: 150ms;
@@ -28,10 +35,16 @@ html[data-theme='sombre'] {
   --muted: #c1cfdf;
   --border: #465a75;
   --primary: #7aa2ff;
+  /* AA : #0f172a sur #7aa2ff = 7,2:1 (le blanc sur bleu pâle échouait) */
+  --primary-contrast: #0f172a;
+  /* AA : #93c5fd sur --surface = 7,3:1, sur --primary-soft = 5,3:1 */
+  --primary-ink: #93c5fd;
   --primary-soft: rgba(122, 162, 255, 0.18);
   --success: #22c55e;
   --warning: #fbbf24;
   --danger: #f87171;
+  /* AA : #450a0a sur #f87171 = 5,8:1 (blanc sur rouge pâle échouait) */
+  --danger-contrast: #450a0a;
   --shadow: rgba(2, 6, 23, 0.35);
   color-scheme: dark;
 }
@@ -94,6 +107,66 @@ html[data-theme='sombre'] .hover\:bg-emerald-50:hover {
 
 html[data-theme='sombre'] .hover\:bg-red-50:hover {
   background-color: rgba(239, 68, 68, 0.18) !important;
+}
+
+/* — Statuts en thème sombre (contraste AA) —
+   Les utilitaires d'état (bg-amber-50, text-red-700…) sont calibrés pour un
+   fond clair : sur --surface sombre ils tombent sous 4,5:1. On les recalcibre
+   sur les variables du thème (valeurs vérifiées AA sur --surface). */
+html[data-theme='sombre'] .bg-amber-50,
+html[data-theme='sombre'] .bg-amber-100 {
+  background-color: rgba(217, 119, 6, 0.14) !important;
+}
+html[data-theme='sombre'] .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.14) !important;
+}
+html[data-theme='sombre'] .bg-red-50,
+html[data-theme='sombre'] .bg-red-100 {
+  background-color: rgba(220, 38, 38, 0.12) !important;
+}
+html[data-theme='sombre'] .border-amber-200,
+html[data-theme='sombre'] .border-amber-400 {
+  border-color: rgba(251, 191, 36, 0.45) !important;
+}
+html[data-theme='sombre'] .border-orange-200 {
+  border-color: rgba(251, 146, 60, 0.45) !important;
+}
+html[data-theme='sombre'] .border-red-200 {
+  border-color: rgba(252, 165, 165, 0.45) !important;
+}
+html[data-theme='sombre'] .text-amber-600,
+html[data-theme='sombre'] .text-amber-700,
+html[data-theme='sombre'] .text-amber-800,
+html[data-theme='sombre'] .text-amber-900 {
+  color: var(--warning) !important;
+}
+html[data-theme='sombre'] .text-orange-600,
+html[data-theme='sombre'] .text-orange-700 {
+  color: var(--warning) !important;
+}
+html[data-theme='sombre'] .text-red-600,
+html[data-theme='sombre'] .text-red-700,
+html[data-theme='sombre'] .text-red-800,
+html[data-theme='sombre'] .text-red-900 {
+  color: #fca5a5 !important;
+}
+html[data-theme='sombre'] .text-emerald-600,
+html[data-theme='sombre'] .text-emerald-700 {
+  color: var(--success) !important;
+}
+html[data-theme='sombre'] .text-violet-600,
+html[data-theme='sombre'] .text-violet-700 {
+  color: #a78bfa !important;
+}
+html[data-theme='sombre'] .text-blue-600,
+html[data-theme='sombre'] .text-blue-700,
+html[data-theme='sombre'] .text-blue-800,
+html[data-theme='sombre'] .text-blue-900 {
+  color: var(--primary-ink) !important;
+}
+html[data-theme='sombre'] .bg-blue-50,
+html[data-theme='sombre'] .bg-blue-100 {
+  background-color: var(--primary-soft) !important;
 }
 
 /* Tableaux de données : survol de ligne fluide et thème-aware
