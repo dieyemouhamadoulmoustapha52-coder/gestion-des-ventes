@@ -1,7 +1,7 @@
 /**
- * Écran principal — Caisse.
+ * Écran principal — Caisse — @audience caissier.
  * Grille produits + recherche (focus auto) + puces catégories ;
- * panier (useReducer via contexte) ; encaissement ; ticket imprimable80 mm.
+ * panier (useReducer via contexte) ; encaissement ; ticket imprimable 80 mm.
  * Raccourcis : / recherche · Entrée ajoute le 1er résultat · Ctrl+Entrée valide.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -19,13 +19,18 @@ import { useCart } from '../context/CartContext.jsx'
 import { useMessages } from '../context/MessagesContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
-import { formatFcfa } from '../lib/money.js'
+import { calculerMonnaie } from '../lib/caisse.js'
+import { formatFcfa, toNumber } from '../lib/money.js'
 import { useDebounce } from '../lib/useDebounce.js'
+
+/** Billets rapides proposés au caissier (FCFA). */
+const BILLETS = [500, 1000, 2000, 5000, 10000]
 
 export default function Caisse() {
   const [search, setSearch] = useState('')
   const [categorie, setCategorie] = useState('')
   const [mode, setMode] = useState('ESPECES')
+  const [montantRecu, setMontantRecu] = useState('') // saisie caissier, jamais envoyée à l'API
   const [lineError, setLineError] = useState(null) // {produit, stock_disponible}
   const [ticket, setTicket] = useState(null)
 
@@ -47,6 +52,11 @@ export default function Caisse() {
   const list = useMemo(() => produits.data?.results ?? [], [produits.data])
   const catList = categories.data?.results ?? []
 
+  // Monnaie à rendre — affichage + ticket uniquement (jamais dans le corps d'API).
+  const monnaie = calculerMonnaie(cart.total, montantRecu)
+  const monnaieBloquante = monnaie.statut === 'insuffisant'
+  const voirMonnaie = mode === 'ESPECES' // le choix de paiement existe toujours ici
+
   const addToCart = (p) => {
     if (p.stock <= 0) {
       toast.error(`« ${p.nom} » est en rupture.`)
@@ -62,7 +72,7 @@ export default function Caisse() {
   }
 
   const validate = () => {
-    if (cart.items.length === 0 || creer.isPending) return
+    if (cart.items.length === 0 || creer.isPending || monnaieBloquante) return
     setLineError(null)
     creer.mutate(
       {
@@ -73,8 +83,14 @@ export default function Caisse() {
         onSuccess: (vente) => {
           // Pas de toast : le succès de vente est porté par la barre de messages.
           notifyVente(formatFcfa(vente.montant_total))
-          setTicket(vente)
+          setTicket({
+            ...vente,
+            ...(monnaie.statut === 'ok'
+              ? { montant_recu: toNumber(montantRecu), monnaie_rendue: monnaie.monnaie }
+              : {}),
+          })
           cart.clear()
+          setMontantRecu('')
         },
         onError: (err) => {
           if (isStockError(err) && err.payload) {
@@ -350,10 +366,63 @@ export default function Caisse() {
                 ))}
               </div>
 
+              {voirMonnaie ? (
+                <div className="space-y-2">
+                  <label htmlFor="caisse-recu" className="block text-sm font-medium text-slate-700">
+                    Montant reçu
+                  </label>
+                  <input
+                    id="caisse-recu"
+                    type="text"
+                    inputMode="numeric"
+                    value={montantRecu}
+                    onChange={(e) => setMontantRecu(e.target.value)}
+                    placeholder="0"
+                    aria-describedby="caisse-monnaie"
+                    aria-invalid={monnaieBloquante ? 'true' : undefined}
+                    className={`h-11 w-full rounded-lg border bg-white px-3 text-sm ${
+                      monnaieBloquante ? 'border-red-500' : 'border-slate-300'
+                    }`}
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {BILLETS.map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        onClick={() => setMontantRecu(String(toNumber(montantRecu) + b))}
+                        className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        +{b.toLocaleString('fr-FR')}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setMontantRecu(String(cart.total))}
+                      className="min-h-9 rounded-lg border border-blue-600 bg-blue-50 px-2.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                    >
+                      Compte juste
+                    </button>
+                  </div>
+                  <p
+                    id="caisse-monnaie"
+                    aria-live="polite"
+                    className={`text-sm font-medium ${
+                      monnaieBloquante ? 'text-red-600' : 'text-slate-600'
+                    }`}
+                  >
+                    {monnaie.statut === 'insuffisant'
+                      ? `Il manque ${formatFcfa(monnaie.manque)}`
+                      : monnaie.statut === 'ok'
+                        ? `Monnaie à rendre : ${formatFcfa(monnaie.monnaie)}`
+                        : 'Saisissez le montant reçu (facultatif).'}
+                  </p>
+                </div>
+              ) : null}
+
               <Button
                 className="w-full"
                 onClick={validate}
-                disabled={cart.items.length === 0 || creer.isPending}
+                disabled={cart.items.length === 0 || creer.isPending || monnaieBloquante}
               >
                 {creer.isPending
                   ? 'Encaissement…'
