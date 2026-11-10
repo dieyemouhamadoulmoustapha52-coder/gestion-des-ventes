@@ -9,7 +9,7 @@
 /**
  * Mode de paiement (enum Django ModePaiement).
  * L'écran de caisse n'utilise que les 3 premiers.
- * @typedef {'ESPECES'|'WAVE'|'ORANGE_MONEY'|'CARTE'} ModePaiement
+ * @typedef {'ESPECES'|'WAVE'|'ORANGE_MONEY'} ModePaiement
  */
 
 /**

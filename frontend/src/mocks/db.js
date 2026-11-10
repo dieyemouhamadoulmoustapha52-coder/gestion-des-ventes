@@ -28,13 +28,13 @@ const CLIENTS = [
   'Mamadou Cissé', 'Aïssatou Diop', 'Ousmane Diallo', 'Mariama Sy',
 ]
 
-/** Mode de paiement pondéré (Espèces majoritaire, comme en boutique). */
+/** Mode de paiement pondéré (Espèces majoritaire, comme en boutique).
+ *  Pas de Carte : la caisse n'expose pas ce mode. */
 const pickMode = (rand) => {
   const r = rand()
-  if (r < 0.45) return 'ESPECES'
-  if (r < 0.75) return 'WAVE'
-  if (r < 0.95) return 'ORANGE_MONEY'
-  return 'CARTE'
+  if (r < 0.5) return 'ESPECES'
+  if (r < 0.8) return 'WAVE'
+  return 'ORANGE_MONEY'
 }
 
 /**
@@ -100,12 +100,11 @@ function genererHistorique(produits) {
   return { ventes, lignes, seqVente: idVente, seqLigne: idLigne }
 }
 
-export const MODES = ['ESPECES', 'WAVE', 'ORANGE_MONEY', 'CARTE']
+export const MODES = ['ESPECES', 'WAVE', 'ORANGE_MONEY']
 export const MODE_LABELS = {
   ESPECES: 'Espèces',
   WAVE: 'Wave',
   ORANGE_MONEY: 'Orange Money',
-  CARTE: 'Carte',
 }
 
 /** Sérialiseur DecimalField → chaîne DRF ("15500.00") */

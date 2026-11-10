@@ -160,7 +160,7 @@ export default function Rapport() {
                       value={e.total}
                       total={data.ca_total}
                       detail={`${e.nb_ventes} vente${e.nb_ventes > 1 ? 's' : ''}`}
-                      tone="bg-blue-600"
+                      tone="bg-[var(--primary)]"
                     />
                   ))}
                 </ul>
@@ -184,7 +184,7 @@ export default function Rapport() {
                       label={c.categorie}
                       value={c.ca}
                       total={data.ca_total}
-                      tone="bg-emerald-600"
+                      tone="bg-[var(--success)]"
                     />
                   ))}
                 </ul>

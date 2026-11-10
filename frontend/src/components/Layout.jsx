@@ -122,6 +122,11 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <div className="border-t border-[var(--border)] p-3">
+          <div className="flex justify-center">
+            <ThemeSelector />
+          </div>
+        </div>
       </aside>
 
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:hidden">
@@ -132,9 +137,6 @@ export default function Layout() {
       <main className="lg:pl-64">
         <MessageBar />
         <div className="mx-auto max-w-6xl px-4 py-6 pb-28 lg:pb-10">
-          <div className="mb-4 flex justify-end">
-            <ThemeSelector />
-          </div>
           <DemoBanner />
           <ScreenErrorBoundary resetKey={location.pathname}>
             <Suspense fallback={<PageSkeleton />}>

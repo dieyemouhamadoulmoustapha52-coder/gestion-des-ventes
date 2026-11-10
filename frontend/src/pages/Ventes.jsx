@@ -6,7 +6,7 @@
  * détail en tiroir, réimpression du ticket.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Download, Eye, Receipt, Send } from 'lucide-react'
+import { Download, Eye, Receipt } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import Drawer from '../components/Drawer.jsx'
@@ -15,6 +15,7 @@ import ErrorState from '../components/ErrorState.jsx'
 import Pagination from '../components/Pagination.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import Ticket from '../components/Ticket.jsx'
+import WhatsappIcon from '../components/WhatsappIcon.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { listVentesDetaillees } from '../api/ventes.js'
 import { useBoutique } from '../config/boutique.js'
@@ -40,7 +41,6 @@ const MODE_TONES = {
   ESPECES: 'green',
   WAVE: 'blue',
   ORANGE_MONEY: 'orange',
-  CARTE: 'slate',
 }
 
 /** Lit les filtres depuis l'URL (retour/avant du navigateur compris). */
@@ -223,7 +223,7 @@ export default function Ventes() {
                 onClick={() => setFiltre(actif && hasFilters ? { du: '', au: '' } : { du: r.du, au: r.au })}
                 className={`min-h-11 rounded-lg border px-3 text-sm font-medium transition ${
                   actif
-                    ? 'border-blue-600 bg-blue-600 text-white'
+                    ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-contrast)]'
                     : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -434,7 +434,7 @@ export default function Ventes() {
                 className="flex-1"
                 onClick={() => ouvrirWhatsApp(buildWhatsAppLink(detail.data, boutique))}
               >
-                <Send size={16} aria-hidden="true" />
+                <WhatsappIcon size={16} />
                 Envoyer par WhatsApp
               </Button>
             </div>
@@ -496,9 +496,9 @@ export default function Ventes() {
               </ul>
             </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
-              <span className="text-sm font-medium text-blue-900">Total</span>
-              <span className="text-lg font-bold text-blue-900">
+            <div className="flex items-center justify-between rounded-xl bg-[var(--primary-soft)] px-4 py-3">
+              <span className="text-sm font-medium text-[var(--primary-ink)]">Total</span>
+              <span className="text-lg font-bold text-[var(--primary-ink)]">
                 {formatFcfa(detail.data.montant_total)}
               </span>
             </div>

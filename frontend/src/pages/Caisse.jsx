@@ -2,7 +2,10 @@
  * Écran principal — Caisse — @audience caissier.
  * Grille produits + recherche (focus auto) + puces catégories ;
  * panier (useReducer via contexte) ; encaissement ; ticket imprimable 80 mm.
- * Raccourcis : / recherche · Entrée ajoute le 1er résultat · Ctrl+Entrée valide.
+ * Raccourcis (bloc d'aide unique sous la recherche) :
+ *   / activer la recherche · ↑↓ parcourir les résultats ·
+ *   Entrée ajoute le produit surligné · Échap vide la recherche ·
+ *   F2 ou Ctrl+Entrée encaisse le panier.
  */
 import { useEffect, useDeferredValue, useMemo, useRef, useState } from 'react'
 import { Minus, Package, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react'
@@ -27,6 +30,10 @@ const BILLETS = [500, 1000, 2000, 5000, 10000]
 
 /** Nombre max de résultats surlignables dans la liste rapide. */
 const MAX_RESULTATS = 8
+
+/** Touche du bloc d'aide — un style unique pour tout l'écran. */
+const KBD =
+  'rounded border border-[var(--border)] bg-[var(--surface-alt)] px-1.5 py-0.5 font-mono text-[var(--text)]'
 
 export default function Caisse() {
   const [search, setSearch] = useState('')
@@ -194,11 +201,6 @@ export default function Caisse() {
           <h1 className="text-2xl font-bold text-slate-900">Caisse</h1>
           <p className="text-sm text-slate-500">Sélectionnez les produits, puis encaissez.</p>
         </div>
-        <p className="hidden rounded-lg bg-white px-3 py-2 text-xs text-slate-500 ring-1 ring-slate-200 sm:block">
-          <kbd className="font-mono">/</kbd> recherche · <kbd className="font-mono">Entrée</kbd>{' '}
-          ajoute · <kbd className="font-mono">F2</kbd> encaisse ·{' '}
-          <kbd className="font-mono">Ctrl+Entrée</kbd> valide
-        </p>
       </div>
 
       {/* Ticket de la vente validée — affiché en ligne (aucune popup) */}
@@ -257,7 +259,7 @@ export default function Caisse() {
                     onMouseEnter={() => setHighlight(i)}
                     onClick={() => !rupture && addToCart(p)}
                     className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm ${
-                      i === highlight ? 'bg-blue-50' : ''
+                      i === highlight ? 'bg-[var(--primary-soft)]' : ''
                     } ${rupture ? 'cursor-not-allowed opacity-60' : ''}`}
                   >
                     <span className="min-w-0">
@@ -274,27 +276,37 @@ export default function Caisse() {
             </ul>
           ) : null}
 
-          <p className="text-xs text-slate-500">
-            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">↑</kbd>
-            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">↓</kbd>{' '}
-            naviguer ·{' '}
-            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Entrée</kbd>{' '}
-            ajoute · <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">F2</kbd>{' '}
-            encaisse ·{' '}
-            <kbd className="rounded border border-slate-300 bg-white px-1 font-mono">Échap</kbd>{' '}
-            efface
-          </p>
+          {/* Bloc unique de raccourcis — une touche, une action */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs text-[var(--muted)]">
+            <span className="flex items-center gap-1.5">
+              <kbd className={KBD}>/</kbd> activer la recherche
+            </span>
+            <span className="flex items-center gap-1.5">
+              <kbd className={KBD}>↑</kbd>
+              <kbd className={KBD}>↓</kbd> parcourir les résultats
+            </span>
+            <span className="flex items-center gap-1.5">
+              <kbd className={KBD}>Entrée</kbd> ajouter le produit surligné
+            </span>
+            <span className="flex items-center gap-1.5">
+              <kbd className={KBD}>Échap</kbd> vider la recherche
+            </span>
+            <span className="flex items-center gap-1.5">
+              <kbd className={KBD}>F2</kbd> ou <kbd className={KBD}>Ctrl+Entrée</kbd> encaisser
+              le panier
+            </span>
+          </div>
 
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par catégorie">
             <button
               type="button"
               onClick={() => setCategorie('')}
               aria-pressed={categorie === ''}
-              className={`min-h-11 rounded-full px-4 text-sm font-medium transition ${
-                categorie === ''
-                  ? 'bg-blue-600 text-white'
-                  : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-              }`}
+                className={`min-h-11 rounded-full px-4 text-sm font-medium transition ${
+                  categorie === ''
+                    ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
+                    : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
             >
               Toutes
             </button>
@@ -306,7 +318,7 @@ export default function Caisse() {
                 aria-pressed={categorie === String(c.id)}
                 className={`min-h-11 rounded-full px-4 text-sm font-medium transition ${
                   categorie === String(c.id)
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                     : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -343,7 +355,7 @@ export default function Caisse() {
                     className={`flex flex-col gap-1.5 rounded-xl border p-3 text-left transition ${
                       rupture
                         ? 'cursor-not-allowed border-slate-200 bg-slate-100 opacity-60'
-                        : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-[var(--primary)] hover:shadow-sm'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-1">
@@ -357,7 +369,7 @@ export default function Caisse() {
                       )}
                     </div>
                     <span className="line-clamp-2 text-sm font-medium text-slate-900">{p.nom}</span>
-                    <span className="text-sm font-bold text-blue-700">
+                    <span className="text-sm font-bold text-[var(--primary-ink)]">
                       {formatFcfa(p.prix_unitaire)}
                     </span>
                   </button>
@@ -380,7 +392,9 @@ export default function Caisse() {
                 <span
                   key={p.id}
                   className={`flex items-center rounded-lg border ${
-                    p.actif ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'
+                    p.actif
+                      ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                      : 'border-slate-200 bg-white'
                   }`}
                 >
                   <button
@@ -389,7 +403,9 @@ export default function Caisse() {
                     aria-selected={p.actif}
                     onClick={() => cart.activer(i)}
                     className={`min-h-9 rounded-lg px-2.5 text-xs font-medium ${
-                      p.actif ? 'text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                      p.actif
+                        ? 'text-[var(--primary-ink)]'
+                        : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     Panier {i + 1}
@@ -510,7 +526,7 @@ export default function Caisse() {
                     onClick={() => setMode(m)}
                     className={`min-h-11 rounded-lg border px-1 text-sm font-medium transition ${
                       mode === m
-                        ? 'border-blue-600 bg-blue-600 text-white'
+                        ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-contrast)]'
                         : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
@@ -551,7 +567,7 @@ export default function Caisse() {
                     <button
                       type="button"
                       onClick={() => setMontantRecu(String(cart.total))}
-                      className="min-h-9 rounded-lg border border-blue-600 bg-blue-50 px-2.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                      className="min-h-9 rounded-lg border border-[var(--primary)] bg-[var(--primary-soft)] px-2.5 text-xs font-medium text-[var(--primary-ink)] hover:brightness-110"
                     >
                       Compte juste
                     </button>

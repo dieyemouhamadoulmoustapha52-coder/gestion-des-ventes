@@ -1,9 +1,11 @@
 /** Bouton commun — cible tactile ≥ 44 px, focus visible, état désactivé. */
 
 const VARIANTS = {
-  primary: 'bg-[var(--primary)] text-white border border-transparent hover:brightness-110 shadow-[0_10px_20px_rgba(37,99,235,0.22)]',
+  primary:
+    'bg-[var(--primary)] text-[var(--primary-contrast)] border border-transparent hover:brightness-110 shadow-[0_10px_20px_rgba(37,99,235,0.22)]',
   secondary: 'bg-[var(--surface)] text-[var(--text)] border border-[var(--border)] hover:bg-[var(--surface-alt)] shadow-sm',
-  danger: 'bg-[var(--danger)] text-white border border-transparent hover:brightness-110 shadow-[0_10px_22px_rgba(220,38,38,0.25)]',
+  danger:
+    'bg-[var(--danger)] text-[var(--danger-contrast)] border border-transparent hover:brightness-110 shadow-[0_10px_22px_rgba(220,38,38,0.25)]',
   ghost: 'bg-transparent text-[var(--muted)] border border-transparent hover:bg-[var(--surface-alt)] shadow-none',
 }
 
