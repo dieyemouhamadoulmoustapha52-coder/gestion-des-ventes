@@ -1,0 +1,210 @@
+================================================================================
+                    WORKFLOW DE L'UTILISATEUR
+                 Application : Gestion des Ventes
+================================================================================
+
+Périmètre : application de caisse / vente au comptoir (MVP).
+Tech       : React 19 + Vite (frontend) — backend Django/DRF à venir,
+             données actuellement simulées par MSW (mode démo).
+Accès     : aucune authentification pour l'instant (pas de page de login,
+             pas de rôles) — l'application s'ouvre directement sur le
+             tableau de bord. L'auth est prévue plus tard, ajout unique
+             dans frontend/src/api/client.js.
+
+--------------------------------------------------------------------------------
+0. NAVIGATION GLOBALE
+--------------------------------------------------------------------------------
+Menu latéral (desktop >= 1024px) / barre du bas (mobile, 5 onglets) :
+
+  /            Accueil   -> Tableau de bord
+  /caisse      Caisse    -> Ecran de vente (flux principal)
+  /produits    Produits  -> Catalogue & stock
+  /ventes      Ventes    -> Historique des ventes
+  /rapport     Rapport   -> Rapport journalier
+
+Le panier est persistant au-dessus du routage : il survit aux changements
+de page et n'est vidé qu'apres un encaissement reussi.
+
+--------------------------------------------------------------------------------
+1. TABLEAU DE BORD  (page /, frontend/src/pages/Accueil.jsx)
+--------------------------------------------------------------------------------
+Entree de l'application.
+
+  Etape 1  Chargement : 1 seul appel GET /api/rapports/tableau-de-bord/
+  Etape 2  Affichage des 4 cartes KPI :
+             - Chiffre d'affaires du jour (+ % vs hier)
+             - Nombre de ventes du jour
+             - Panier moyen
+             - Valeur du stock
+  Etape 3  Lecture du graphe des 7 derniers jours (aire, tooltip)
+  Etape 4  Consultation du Top 5 produits de la semaine
+  Etape 5  Bloc Stock : total / alerte / rupture
+             -> lien "?stock_bas=true" pour filtrer les produits
+  Etape 6  5 dernieres ventes (raccourci vers l'historique)
+  Rafraichissement automatique toutes les 60 s.
+
+  Actions possibles depuis l'accueil :
+    - Aller en caisse pour vendre
+    - Ouvrir la liste des produits en stock bas
+    - Consulter l'historique des ventes
+
+--------------------------------------------------------------------------------
+2. VENTE EN CAISSE  (page /caisse, frontend/src/pages/Caisse.jsx)
+  --- flux principal, de l'ouverture jusqu'au ticket ---
+--------------------------------------------------------------------------------
+
+  [2.1] L'utilisateur ouvre /caisse
+        -> chargement du catalogue : toutes les pages de
+           GET /api/produits/ (grille sans coupure) + GET /api/categories/
+
+  [2.2] Recherche d'un article
+        - champ auto-focus, recherche debounce 250 ms (code + nom)
+        - ou filtre par puces de categorie
+        - raccourci clavier : "/" place le curseur dans la recherche,
+          "Entree" ajoute le 1er resultat
+
+  [2.3] Ajout au panier
+        - clic sur la carte produit ou Entree
+        - CONTROLE STOCK COTE CLIENT :
+            * stock = 0        -> refus, toast "rupture"
+            * quantite > stock -> refus (plafond au stock disponible)
+            * sinon            -> ajout (action "add" du CartContext)
+        - gestion du stock affichee sur la carte :
+            "N en stock" / badge orange "Stock bas" / badge rouge "Rupture"
+          (produit en rupture desactive en caisse)
+
+  [2.4] Ajustement du panier (tiroir lateral)
+        - augmentation / diminution de quantite (plafonne au stock,
+          plancher a 1)
+        - suppression d'une ligne
+        - vider le panier
+
+  [2.5] Choix du mode de paiement
+        - ESPECES (defaut) | WAVE | ORANGE_MONEY
+        - (le mode CARTE existe dans le modele mais n'est pas expose
+          en caisse ; il apparait en filtre sur l'historique)
+
+  [2.6] Validation : bouton "Encaisser X FCFA" ou raccourci Ctrl+Entree
+        -> POST /api/ventes/  avec {mode_paiement, lignes:[{produit, quantite}]}
+
+  [2.7] Traitement serveur (contrat ; backend a implementer)
+        - service creer_vente, transaction atomique (tout ou rien)
+        - controle complet du stock AVANT ecriture
+        - si stock insuffisant -> 409 stock_insuffisant, RIEN n'est ecrit
+        - sinon : creation vente + lignes (prix_unitaire fige),
+          decrement atomique du stock, calcul du montant total -> 201
+
+  [2.8] Gestion d'erreur (409 stock)
+        - l'erreur est rattachee A LA LIGNE fautive du panier
+          ("N disponibles seulement")
+        - l'utilisateur corrige la quantite ou retire la ligne
+        - puis relance l'encaissement
+
+  [2.9] Succes
+        - toast "Vente n° X encaissee"
+        - ouverture du TICKET 80 mm (composant Ticket) :
+            enseigne boutique, n° vente, date (fuseau Africa/Dakar),
+            lignes (nom / qte / prix U / total), quantite totale,
+            HT / TVA 18% / total a payer, mode de reglement,
+            client ("Client de passage" par defaut), caissier,
+            message de remerciement
+        - bouton IMPRIMER -> window.print() (mise en page 80 mm)
+        - le panier est vide
+        - invalidation du cache React Query : produits (stock), ventes,
+          rapport, tableau de-bord -> les 4 ecrans se rafraichissent
+
+  [2.10] Suite du cycle
+        - la vente est visible dans /ventes (detail + reimpression)
+        - elle est comptee dans /rapport du jour
+        - elle apparait dans le tableau de bord (refresh 60 s)
+
+  Remarques :
+    - le champ client_nom est prevu par l'API mais pas saisi par l'UI
+      de caisse actuelle
+    - pas de statut de vente, pas d'annulation, pas de paiement partiel :
+      vente = encaissement = ticket, en un seul appel, definitif
+
+--------------------------------------------------------------------------------
+3. CATALOGUE & STOCK  (page /produits, frontend/src/pages/Produits.jsx)
+--------------------------------------------------------------------------------
+  [3.1] Liste paginee (10/page) : GET /api/produits/
+  [3.2] Recherche (code + nom), filtre categorie, filtre "Stock bas"
+        (synchronise dans l'URL via ?stock_bas=true)
+  [3.3] Creation d'un produit : bouton "Nouveau produit"
+        -> modal : code (SKU unique), nom, categorie, prix unitaire,
+           stock initial, seuil d'alerte
+  [3.4] Edition d'un produit : action "Editer" -> meme modal (PATCH)
+  [3.5] Gestion des categories : bouton "Categories" -> modal dediee
+        (creation / edition / suppression)
+  [3.6] Reapprovisionnement : action "Reapprovisionner"
+        -> saisie d'une quantite > 0
+        -> POST /api/produits/{id}/reapprovisionner/  (stock += quantite,
+           operation atomique)
+  [3.7] Suppression : confirmation obligatoire
+        -> 409 PROTECT si le produit figure dans des ventes
+           (ou si la categorie a des produits) : suppression refusee,
+           message + conseil
+
+  ETATS DU STOCK (derives a chaque lecture, jamais stockes) :
+        Normal    : stock > seuil_alerte      -> "N en stock"
+        Alerte    : stock <= seuil_alerte     -> badge orange "Stock bas"
+        Rupture   : stock = 0                 -> badge rouge "Rupture"
+  Transitions :
+        Sortie (vente)          : stock -= quantite  (atomique)
+        Entree (reappro.)       : stock += quantite
+
+--------------------------------------------------------------------------------
+4. HISTORIQUE DES VENTES  (page /ventes, frontend/src/pages/Ventes.jsx)
+--------------------------------------------------------------------------------
+  [4.1] Liste paginee : GET /api/ventes/ (sans lignes, tri date desc)
+  [4.2] Filtres : date + mode de paiement
+  [4.3] Clic sur une vente -> tiroir (Drawer) de detail :
+           en-tete (date, mode, client) + lignes detaillees + total
+  [4.4] Bouton "Reimprimer le ticket" -> reouverture du Ticket 80 mm
+  [4.5] Historique immuable : ni modification, ni annulation, ni
+        suppression de vente (pas d'API prevue)
+
+--------------------------------------------------------------------------------
+5. RAPPORT JOURNALIER  (page /rapport, frontend/src/pages/Rapport.jsx)
+--------------------------------------------------------------------------------
+  [5.1] Choix de la date (bouton "Aujourd'hui" en raccourci)
+        -> GET /api/rapports/jour/?date=YYYY-MM-DD
+  [5.2] 3 indicateurs : CA, nombre de ventes, panier moyen
+  [5.3] Encaissements par mode de paiement (barres en %)
+  [5.4] CA par categorie (barres)
+  [5.5] Top 3 produits (quantites)
+  [5.6] Produits a racheter : badges "Rupture" / "A racheter"
+        (etat instantane du stock, pas un agregat du jour)
+
+--------------------------------------------------------------------------------
+6. ERREURS RENCONTEES DANS LE FLUX
+--------------------------------------------------------------------------------
+  400 validation_error   -> messages par champ dans les modales
+                            (ProduitModal, CategorieManager)
+  409 stock_insuffisant  -> vente refusee en entier, ligne marquee
+                            dans le panier, corriger puis reessayer
+  409 PROTECT            -> suppression refusee (produit vendu ou
+                            categorie avec produits)
+  404                    -> "Non trouve."
+  timeout (15 s)         -> ApiError timeout
+  network_error          -> ApiError reseau
+
+--------------------------------------------------------------------------------
+7. MODES D'EXECUTION
+--------------------------------------------------------------------------------
+  Mode demo (actuel)  : VITE_USE_MOCK=true -> MSW rejoue le contrat API,
+                        30 jours de ventes simules, banniere "Mode demo"
+  Mode integration    : VITE_USE_MOCK=false -> vrai Django via le proxy
+                        Vite (/api -> http://127.0.0.1:8000)
+
+--------------------------------------------------------------------------------
+8. HORS PERIMETRE MVP (non couvert aujourd'hui)
+--------------------------------------------------------------------------------
+  Authentification / rôles, table clients, facturation formelle,
+  commandes / fournisseurs, mouvements de stock, TVA et remises
+  (hors MVP malgre la TVA 18 % calculee sur le ticket), rapports
+  mensuels/annuels, exports CSV/PDF, ecran de parametres.
+
+================================================================================
+Diagramme associe : workflow-utilisateur.png (a la racine du depot)
+================================================================================

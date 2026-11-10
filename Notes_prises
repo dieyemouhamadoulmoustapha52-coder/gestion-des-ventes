@@ -1,0 +1,16 @@
+faire une slide « Pourquoi pas Sage ? » pour la présentation du client.
+
+La partie pour le patron doit avoir une version mobile et tablette pour des présentations etc pour que ça soit plus pratique pour avoir les rapports et les historique de  ventes
+
+Moyens de paiement : espèces, Wave, Orange Money, carte. Le rapport de caisse est ventilé par moyen de paiement. Il s’agit d’enregistrer le moyen utilisé, pas de s’intégrer aux API.
+Ventes à crédit / dettes clients : très courant chez nous. Carnet de dettes, paiements partiels, liste de qui doit quoi.
+Mode hors-ligne : coupures de courant et d’internet fréquentes. Si ton logiciel marche sans connexion et se synchronise après, c’est un vrai avantage. C’est aussi le point le plus lourd techniquement.
+Unités et conditionnements : un sac de 25 kg vendu en entier ou au kilo, un carton ou à l’unité. C’est très concret dans le commerce local.
+Clôture de caisse : fond de caisse, montant attendu et montant compté, écart. Les patrons adorent ça.
+
+Migre petit à petit : TypeScript accepte les fichiers JS à côté, tu convertis écran par écran.
+Active le mode strict dès le début.
+Astuce pro : Django peut générer un schéma OpenAPI (avec drf-spectacular) et un outil comme openapi-typescript en tire les types du front. Les types du front et du backend restent alors toujours synchronisés, ce qui aide beaucoup quand vous travaillez à deux sur des machines séparées.
+
+Plus d’internet, mais le PC marche : l’app doit continuer à vendre.
+Coupure de courant : le PC s’éteint. Ce qui compte, c’est qu’aucune vente validée ne soit perdue. Chaque vente doit être écrite dans la base locale avant d’afficher « vente validée ». Côté matériel, conseille au client un ondulateur (onduleur) pour le PC de caisse, c’est peu cher et efficace.
