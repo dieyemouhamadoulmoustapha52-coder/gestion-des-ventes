@@ -6,7 +6,7 @@
  * détail en tiroir, réimpression du ticket.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Download, Eye, Receipt } from 'lucide-react'
+import { Download, Eye, Receipt, Send } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import Drawer from '../components/Drawer.jsx'
@@ -23,6 +23,7 @@ import { MODE_LABELS } from '../lib/constants.js'
 import { dateDakar, decaleJours, FUSEAU } from '../lib/dates.js'
 import { genererCsvVentes, nomFichierCsv, telechargerCsv } from '../lib/exportCsv.js'
 import { formatFcfa } from '../lib/money.js'
+import { buildWhatsAppLink, ouvrirWhatsApp } from '../lib/whatsapp.js'
 
 const DTF = new Intl.DateTimeFormat('fr-FR', {
   timeZone: FUSEAU,
@@ -386,14 +387,24 @@ export default function Ventes() {
         onClose={() => setSelectedId(null)}
         footer={
           detail.data ? (
-            <Button
-              className="w-full"
-              onClick={() => setTicketId(detail.data.id)}
-              disabled={detail.isPending}
-            >
-              <Receipt size={16} aria-hidden="true" />
-              Imprimer le ticket
-            </Button>
+            <div className="flex w-full flex-wrap gap-2">
+              <Button
+                className="flex-1"
+                onClick={() => setTicketId(detail.data.id)}
+                disabled={detail.isPending}
+              >
+                <Receipt size={16} aria-hidden="true" />
+                Imprimer le ticket
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => ouvrirWhatsApp(buildWhatsAppLink(detail.data, boutique))}
+              >
+                <Send size={16} aria-hidden="true" />
+                Envoyer par WhatsApp
+              </Button>
+            </div>
           ) : null
         }
       >

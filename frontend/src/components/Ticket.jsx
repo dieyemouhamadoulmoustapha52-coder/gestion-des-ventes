@@ -3,12 +3,13 @@
  * Affiché EN LIGNE (aucune popup) : aperçu + bouton « Imprimer le ticket ».
  * À l'impression : seul le ticket est imprimé (@page 80mm, voir Ticket.css).
  */
-import { Printer, X } from 'lucide-react'
+import { Printer, Send, X } from 'lucide-react'
 import Button from './Button.jsx'
 import { DEFAULT_BOUTIQUE } from '../config/boutique.js'
 import { MODE_LABELS } from '../lib/constants.js'
 import { dateHeureDakar } from '../lib/dates.js'
 import { formatFcfa, toNumber } from '../lib/money.js'
+import { buildWhatsAppLink, ouvrirWhatsApp } from '../lib/whatsapp.js'
 import './Ticket.css'
 
 /**
@@ -36,6 +37,10 @@ export default function Ticket({ vente, boutique = {}, onFermer }) {
           Ticket — vente n° {vente.id}
         </h2>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => ouvrirWhatsApp(buildWhatsAppLink(vente, shop))}>
+            <Send size={16} aria-hidden="true" />
+            Envoyer par WhatsApp
+          </Button>
           <Button onClick={() => window.print()}>
             <Printer size={16} aria-hidden="true" />
             Imprimer le ticket
