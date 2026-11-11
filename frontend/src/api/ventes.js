@@ -1,14 +1,11 @@
-/** Endpoint vente — ventes/ (liste légère, création, détail avec lignes). */
+/** Endpoint vente — ventes/ (liste légère, création, détail avec lignes).
+ *  Toute traduction du contrat vit dans src/api/adaptateur.js. */
 import { request } from './client.js'
-import { toNumber } from '../lib/money.js'
+import { versVueLigne, versVueVente } from './adaptateur.js'
 
-const normVente = (v) => ({ ...v, montant_total: toNumber(v.montant_total) })
-const normLigne = (l) => ({
-  ...l,
-  prix_unitaire: toNumber(l.prix_unitaire),
-  montant_ligne: toNumber(l.montant_ligne),
-})
-const normComplete = (v) => ({ ...normVente(v), lignes: (v.lignes || []).map(normLigne) })
+const normVente = (v) => versVueVente(v)
+const normLigne = (l) => versVueLigne(l)
+const normComplete = (v) => versVueVente(v, (v.lignes ?? []).map(normLigne))
 
 /**
  * Liste paginée des ventes (sans lignes).

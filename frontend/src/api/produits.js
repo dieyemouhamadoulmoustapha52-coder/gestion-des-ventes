@@ -1,9 +1,10 @@
-/** Endpoint produit — produits/ avec search, categorie, stock_bas, pagination. */
+/** Endpoint produit — produits/ avec search, categorie, stock_bas, pagination.
+ *  Toute traduction du contrat vit dans src/api/adaptateur.js. */
 import { request } from './client.js'
-import { toNumber } from '../lib/money.js'
+import { versVuePage, versVueProduit } from './adaptateur.js'
 
-/** Normalisation : prix_unitaire "6200.00" → number. */
-const norm = (p) => ({ ...p, prix_unitaire: toNumber(p.prix_unitaire) })
+/** Normalisation : Decimal DRF → number + conditionnements + alias legacy. */
+const norm = versVueProduit
 
 /**
  * @param {{search?: string, categorie?: number|string|null,
@@ -18,7 +19,7 @@ export async function listProduits({ search, categorie, stock_bas, page } = {}) 
   if (page) qs.set('page', String(page))
   const q = qs.toString()
   const data = await request(`produits/${q ? `?${q}` : ''}`)
-  return { ...data, results: data.results.map(norm) }
+  return versVuePage(data, norm)
 }
 
 /** @param {number} id @returns {Promise<import('./types.js').Produit>} */

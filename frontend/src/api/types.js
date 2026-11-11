@@ -13,6 +13,19 @@
  */
 
 /**
+ * Mode de vente (conditionnement) — contrat « modes de vente ».
+ * @typedef {Object} Conditionnement
+ * @property {number|null} id `null` pour un Détail dérivé (produit sans mode enregistré)
+ * @property {string} libelle unique par produit (insensible à la casse)
+ * @property {number} facteur entier ≥ 1 — unités de base par mode (1 = Détail)
+ * @property {number} prix_vente FCFA pour un mode entier, > 0
+ * @property {string} code optionnel, sans espaces, MAJUSCULES, unique (aucun pour le Détail)
+ * @property {boolean} est_detail exactement un mode de facteur 1
+ * @property {boolean} actif mode retiré → false (jamais supprimé)
+ * @property {number} ordre position dans la liste
+ */
+
+/**
  * @typedef {Object} Categorie
  * @property {number} id
  * @property {string} nom
@@ -20,17 +33,24 @@
  */
 
 /**
- * Produit normalisé (prix_unitaire déjà converti en number).
+ * Produit normalisé (montants déjà convertis en number par l'adaptateur).
+ * Champs du contrat + alias legacy des écrans non migrés.
  * @typedef {Object} Produit
  * @property {number} id
  * @property {string} code          SKU unique
  * @property {string} nom
  * @property {number} categorie     id de la catégorie
  * @property {string} categorie_nom libellé (dénormalisé, affichage)
- * @property {number} prix_unitaire FCFA (normalisé)
- * @property {number} stock
- * @property {number} seuil_alerte
- * @property {boolean} est_en_alerte stock <= seuil_alerte (dérivé côté serveur)
+ * @property {string} unite_base    ex. « bouteille » (30 caractères max)
+ * @property {number} prix_achat    coût d'UNE unité de base (décimal, 2 chiffres)
+ * @property {number} quantite      stock EN UNITÉS DE BASE
+ * @property {number} seuil_alerte  en unités de base
+ * @property {number} prix          prix du mode Détail (toujours synchronisé)
+ * @property {Conditionnement[]} conditionnements
+ * @property {boolean} est_en_alerte quantite <= seuil_alerte (dérivé)
+ * @property {number} prix_unitaire @alias legacy = prix
+ * @property {number} stock         @alias legacy = quantite
+ * @property {number} seuil         @alias legacy = seuil_alerte
  */
 
 /**
@@ -40,17 +60,27 @@
  * @property {string} client_nom
  * @property {ModePaiement} mode_paiement
  * @property {number} montant_total normalisé
+ * @property {number} total @alias legacy = montant_total (réponse POST du contrat)
+ * @property {ModePaiement} moyen_paiement @alias legacy = mode_paiement
  */
 
 /**
+ * Ligne de vente : SNAPSHOT figé à la création (voir contrat).
+ * Anciennes lignes : libellé « Détail », facteur 1, quantite_base = quantite.
  * @typedef {Object} LigneVente
  * @property {number} id
  * @property {number} produit
- * @property {string} produit_nom
- * @property {string} produit_code
- * @property {number} quantite
- * @property {number} prix_unitaire figé au moment T, normalisé
- * @property {number} montant_ligne normalisé
+ * @property {string} produit_nom   dénormalisé (affichage)
+ * @property {string} produit_code  dénormalisé (affichage)
+ * @property {number|null} conditionnement id du mode (null = Détail)
+ * @property {string} libelle       libellé du mode figé (« Carton », « Détail »)
+ * @property {number} facteur       unités de base par mode figé
+ * @property {number} prix_unitaire prix d'UN mode (figé)
+ * @property {number} quantite      nombre de MODES vendus
+ * @property {number} quantite_base quantite × facteur (unités de base)
+ * @property {number|null} cout_unitaire_base coût d'unité de base figé
+ * @property {number} total_ligne   prix_unitaire × quantite
+ * @property {number} montant_ligne @alias legacy = total_ligne
  */
 
 /**
