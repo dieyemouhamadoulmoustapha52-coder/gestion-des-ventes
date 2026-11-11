@@ -1,11 +1,18 @@
 /**
- * Handlers MSW — implémentation EXACTE de docs/API_CONTRACT.md :
- * URLs avec slash final, pagination DRF, DecimalField en chaînes,
- * latence 200-400 ms, erreurs 400 par champ, 409 stock_insuffisant.
+ * Handlers MSW — contrat « modes de vente » (snake_case) :
+ * produits avec `conditionnements`, ventes avec snapshots et cumul du stock en
+ * unités de base, réapprovisionnement par mode, erreurs 400/409 du contrat.
+ * Enveloppes : URLs avec slash final, pagination DRF, DecimalField en chaînes,
+ * latence 200-400 ms, erreurs 400 par champ.
  */
 import { http, HttpResponse, delay } from 'msw'
 import * as db from './db.js'
 import { dateDakar, decaleJours } from '../lib/dates.js'
+import {
+  modeDetail,
+  normaliserProduit,
+  validerConditionnements,
+} from '../lib/conditionnements.js'
 
 const wait = () => delay(200 + Math.random() * 200)
 const ok = async (body) => {
@@ -53,6 +60,72 @@ function parseDate(s) {
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
   const d = new Date(`${s}T00:00:00Z`)
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s
+}
+
+/** Entier ≥ 0 à partir d'une saisie (null si invalide). */
+function entierPositif(valeur) {
+  if (valeur === '' || valeur === null || valeur === undefined) return null
+  const n = typeof valeur === 'string' ? Number(valeur.trim()) : valeur
+  return Number.isInteger(n) && n >= 0 ? n : null
+}
+
+/**
+ * Liste brute de modes → forme de stockage (libellé/numéros trimés, code en
+ * MAJUSCULES, `ordre` = position, détail sans code propre).
+ * Appelé APRÈS validation (validerConditionnements lit les valeurs brutes).
+ * @param {any[]} brut
+ * @param {(id: number) => any} [parId] mode existant du produit (conserve l'id)
+ */
+function normaliserListeBrute(brut, parId = () => null) {
+  return brut.map((m, i) => {
+    const facteur = Math.trunc(Number(m?.facteur))
+    const estDetail = m?.est_detail === true || (m?.est_detail !== false && facteur === 1)
+    const existant = m?.id !== null && m?.id !== undefined ? parId(Number(m.id)) : null
+    return {
+      id: existant ? existant.id : db.state.seq.conditionnement++,
+      libelle: String(m?.libelle ?? '').trim(),
+      facteur,
+      prix_vente: Number(m?.prix_vente),
+      code: estDetail ? '' : String(m?.code ?? '').trim().toUpperCase(),
+      est_detail: estDetail,
+      actif: true,
+      ordre: i,
+    }
+  })
+}
+
+/**
+ * Valide une liste de modes soumise contre les codes déjà pris (tous les
+ * produits + les modes hors de la liste soumise).
+ * @param {any[]} liste modes bruts soumis
+ * @param {number|null} produitId produit édité (null = création)
+ * @returns {string[]} messages en français (vide = valide)
+ */
+function messagesConditionnements(liste, produitId = null) {
+  const idsSoumis = new Set(
+    liste.map((m) => (m?.id !== null && m?.id !== undefined ? Number(m.id) : -1)),
+  )
+  const codesModes = db
+    .tousLesModes()
+    .filter(
+      ({ produit, mode }) =>
+        !(
+          produitId !== null &&
+          produit.id === produitId &&
+          mode.id !== null &&
+          idsSoumis.has(Number(mode.id))
+        ),
+    )
+    .map(({ mode }) => mode.code)
+  const codesOccupes = [...db.state.produits.map((p) => p.code), ...codesModes].filter(Boolean)
+
+  const { global, modes } = validerConditionnements(liste, { codesOccupes })
+  const messages = [...global]
+  modes.forEach((erreurs, i) => {
+    const nom = String(liste[i]?.libelle ?? '').trim() || `n° ${i + 1}`
+    for (const msg of Object.values(erreurs)) messages.push(`Mode « ${nom} » : ${msg}`)
+  })
+  return messages
 }
 
 export const handlers = [
@@ -117,7 +190,7 @@ export const handlers = [
       list = list.filter((p) => fold(p.code).includes(q) || fold(p.nom).includes(q))
     }
     if (categorie) list = list.filter((p) => p.categorie === Number(categorie))
-    if (stockBas) list = list.filter((p) => p.stock <= p.seuil)
+    if (stockBas) list = list.filter((p) => p.quantite <= p.seuil_alerte)
 
     const list2 = sortedByNom(list).map(db.serializeProduit)
     return ok(paginate(list2, request))
@@ -129,7 +202,18 @@ export const handlers = [
     const code = String(body.code ?? '').trim()
     const nom = String(body.nom ?? '').trim()
     const categorie = Number(body.categorie)
-    const prix = Number(body.prix_unitaire)
+    const uniteBase = String(body.unite_base ?? 'unité').trim() || 'unité'
+    const prixAchat = body.prix_achat === undefined ? 0 : Number(body.prix_achat)
+    // ancien format accepté : prix_unitaire / stock
+    const prix =
+      body.prix !== undefined ? Number(body.prix)
+        : body.prix_unitaire !== undefined ? Number(body.prix_unitaire)
+        : NaN
+    const quantite =
+      body.quantite !== undefined ? entierPositif(body.quantite)
+        : body.stock !== undefined ? entierPositif(body.stock)
+        : 0
+    const seuil = body.seuil_alerte !== undefined ? entierPositif(body.seuil_alerte) : 0
 
     if (!code) errors.code = ['Ce champ est requis.']
     else if (db.state.produits.some((p) => fold(p.code) === fold(code))) {
@@ -137,19 +221,41 @@ export const handlers = [
     }
     if (!nom) errors.nom = ['Ce champ est requis.']
     if (!db.findCategorie(categorie)) errors.categorie = ['Cette catégorie n\'existe pas.']
-    if (body.prix_unitaire === undefined || !Number.isFinite(prix) || prix < 0) {
-      errors.prix_unitaire = ['Saisissez un prix valide (≥ 0).']
+    if (uniteBase.length > 30) errors.unite_base = ['30 caractères maximum.']
+    if (!Number.isFinite(prixAchat) || prixAchat < 0) {
+      errors.prix_achat = ['Saisissez un coût valide (≥ 0).']
     }
-    const stock = body.stock === undefined ? 0 : Number(body.stock)
-    const seuil = body.seuil_alerte === undefined ? 0 : Number(body.seuil_alerte)
-    if (!Number.isInteger(stock) || stock < 0) errors.stock = ['Entier positif attendu.']
-    if (!Number.isInteger(seuil) || seuil < 0) errors.seuil_alerte = ['Entier positif attendu.']
+    if (!Number.isFinite(prix) || prix < 0) {
+      errors.prix = ['Saisissez un prix valide (≥ 0).']
+    }
+    if (quantite === null) errors.quantite = ['Entier positif attendu.']
+    if (seuil === null) errors.seuil_alerte = ['Entier positif attendu.']
+
+    const brutModes = Array.isArray(body.conditionnements) ? body.conditionnements : null
+    if (brutModes) {
+      const messages = messagesConditionnements(brutModes, null)
+      if (messages.length) errors.conditionnements = messages
+    }
     if (Object.keys(errors).length) return fail(400, errors)
 
     const p = {
-      id: db.state.seq.produit++, code, nom, categorie,
-      prix, stock, seuil,
+      id: db.state.seq.produit++,
+      code,
+      nom,
+      categorie,
+      unite_base: uniteBase,
+      prix_achat: prixAchat,
+      prix: Number.isFinite(prix) ? prix : 0,
+      quantite: quantite ?? 0,
+      seuil_alerte: seuil ?? 0,
+      conditionnements: brutModes
+        ? normaliserListeBrute(brutModes)
+        : [db.nouveauDetail(Number.isFinite(prix) ? prix : 0, db.state.seq.conditionnement++)],
     }
+    // prix toujours synchronisé sur le mode Détail
+    const detail = p.conditionnements.find((m) => m.est_detail)
+    if (detail) p.prix = detail.prix_vente
+
     db.state.produits.push(p)
     return created(db.serializeProduit(p))
   }),
@@ -183,23 +289,46 @@ export const handlers = [
       if (!cat) errors.categorie = ['Cette catégorie n\'existe pas.']
       else next.categorie = cat.id
     }
-    if (body.prix_unitaire !== undefined) {
-      const prix = Number(body.prix_unitaire)
-      if (!Number.isFinite(prix) || prix < 0) errors.prix_unitaire = ['Saisissez un prix valide (≥ 0).']
+    if (body.unite_base !== undefined) {
+      const u = String(body.unite_base).trim() || 'unité'
+      if (u.length > 30) errors.unite_base = ['30 caractères maximum.']
+      else next.unite_base = u
+    }
+    if (body.prix_achat !== undefined) {
+      const pa = Number(body.prix_achat)
+      if (!Number.isFinite(pa) || pa < 0) errors.prix_achat = ['Saisissez un coût valide (≥ 0).']
+      else next.prix_achat = pa
+    }
+    const brutPrix = body.prix !== undefined ? body.prix : body.prix_unitaire
+    if (brutPrix !== undefined) {
+      const prix = Number(brutPrix)
+      if (!Number.isFinite(prix) || prix < 0) errors.prix = ['Saisissez un prix valide (≥ 0).']
       else next.prix = prix
     }
-    if (body.stock !== undefined) {
-      const stock = Number(body.stock)
-      if (!Number.isInteger(stock) || stock < 0) errors.stock = ['Entier positif attendu.']
-      else next.stock = stock
+    const brutQte = body.quantite !== undefined ? body.quantite : body.stock
+    if (brutQte !== undefined) {
+      const q = entierPositif(brutQte)
+      if (q === null) errors.quantite = ['Entier positif attendu.']
+      else next.quantite = q
     }
     if (body.seuil_alerte !== undefined) {
-      const seuil = Number(body.seuil_alerte)
-      if (!Number.isInteger(seuil) || seuil < 0) errors.seuil_alerte = ['Entier positif attendu.']
-      else next.seuil = seuil
+      const seuil = entierPositif(body.seuil_alerte)
+      if (seuil === null) errors.seuil_alerte = ['Entier positif attendu.']
+      else next.seuil_alerte = seuil
+    }
+    if (body.conditionnements !== undefined) {
+      // la liste complète se remplace par PUT (contrat)
+      errors.conditionnements = ['Utilisez PUT pour remplacer la liste des modes de vente.']
     }
     if (Object.keys(errors).length) return fail(400, errors)
     Object.assign(p, next)
+
+    // prix toujours synchronisé sur le mode Détail (ancien format accepté)
+    if (next.prix !== undefined) {
+      const detail = (p.conditionnements ?? []).find((m) => m.est_detail)
+      if (detail) detail.prix_vente = next.prix
+      else p.conditionnements = [db.nouveauDetail(next.prix, db.state.seq.conditionnement++)]
+    }
     return ok(db.serializeProduit(p))
   }),
 
@@ -211,9 +340,17 @@ export const handlers = [
     const code = String(body.code ?? '').trim()
     const nom = String(body.nom ?? '').trim()
     const categorie = Number(body.categorie)
-    const prix = Number(body.prix_unitaire)
-    const stock = body.stock === undefined ? p.stock : Number(body.stock)
-    const seuil = body.seuil_alerte === undefined ? p.seuil : Number(body.seuil_alerte)
+    const uniteBase = String(body.unite_base ?? p.unite_base ?? 'unité').trim() || 'unité'
+    const prixAchat = body.prix_achat !== undefined ? Number(body.prix_achat) : p.prix_achat
+    const quantite =
+      body.quantite !== undefined ? entierPositif(body.quantite)
+        : body.stock !== undefined ? entierPositif(body.stock)
+        : p.quantite
+    const seuil =
+      body.seuil_alerte !== undefined ? entierPositif(body.seuil_alerte)
+        : body.seuil !== undefined ? entierPositif(body.seuil)
+        : p.seuil_alerte
+    const brutPrix = body.prix !== undefined ? body.prix : body.prix_unitaire
 
     if (!code) errors.code = ['Ce champ est requis.']
     else if (db.state.produits.some((x) => x.id !== p.id && fold(x.code) === fold(code))) {
@@ -221,14 +358,65 @@ export const handlers = [
     }
     if (!nom) errors.nom = ['Ce champ est requis.']
     if (!db.findCategorie(categorie)) errors.categorie = ['Cette catégorie n\'existe pas.']
-    if (body.prix_unitaire === undefined || !Number.isFinite(prix) || prix < 0) {
-      errors.prix_unitaire = ['Saisissez un prix valide (≥ 0).']
+    if (uniteBase.length > 30) errors.unite_base = ['30 caractères maximum.']
+    if (!Number.isFinite(prixAchat) || prixAchat < 0) {
+      errors.prix_achat = ['Saisissez un coût valide (≥ 0).']
     }
-    if (!Number.isInteger(stock) || stock < 0) errors.stock = ['Entier positif attendu.']
-    if (!Number.isInteger(seuil) || seuil < 0) errors.seuil_alerte = ['Entier positif attendu.']
+    if (quantite === null) errors.quantite = ['Entier positif attendu.']
+    if (seuil === null) errors.seuil_alerte = ['Entier positif attendu.']
+
+    const brutModes = Array.isArray(body.conditionnements) ? body.conditionnements : null
+    if (brutModes) {
+      const idsConnus = new Set(
+        (p.conditionnements ?? []).filter((m) => m.id !== null).map((m) => m.id),
+      )
+      if (brutModes.some((m) => m?.id !== null && m?.id !== undefined && !idsConnus.has(Number(m.id)))) {
+        errors.conditionnements = ['Mode de vente introuvable pour ce produit.']
+      } else {
+        const messages = messagesConditionnements(brutModes, p.id)
+        if (messages.length) errors.conditionnements = messages
+      }
+    } else if (brutPrix !== undefined && (!Number.isFinite(Number(brutPrix)) || Number(brutPrix) < 0)) {
+      errors.prix = ['Saisissez un prix valide (≥ 0).']
+    }
     if (Object.keys(errors).length) return fail(400, errors)
 
-    Object.assign(p, { code, nom, categorie, prix, stock, seuil })
+    const champs = {
+      code,
+      nom,
+      categorie,
+      unite_base: uniteBase,
+      prix_achat: prixAchat,
+      quantite: quantite ?? 0,
+      seuil_alerte: seuil ?? 0,
+    }
+
+    if (brutModes) {
+      // Liste complète : id = mise à jour, sans id = nouveau, absent = actif:false
+      const parId = new Map(
+        (p.conditionnements ?? []).filter((m) => m.id !== null).map((m) => [m.id, m]),
+      )
+      const suivis = normaliserListeBrute(brutModes, (id) => parId.get(id) ?? null)
+      const detail = suivis.find((m) => m.est_detail)
+      champs.prix = detail ? detail.prix_vente : p.prix
+      const idsSuivis = new Set(suivis.map((m) => m.id))
+      const inactifs = (p.conditionnements ?? [])
+        .filter((m) => !idsSuivis.has(m.id))
+        .map((m) => ({ ...m, actif: false }))
+      champs.conditionnements = [...suivis, ...inactifs]
+    } else {
+      // Ancien format (sans conditionnements) : maintiens un Détail issu de `prix`
+      const prix = brutPrix !== undefined ? Number(brutPrix) : p.prix
+      champs.prix = prix
+      const modes = (p.conditionnements ?? []).map((m) =>
+        m.est_detail ? { ...m, prix_vente: prix } : m,
+      )
+      champs.conditionnements = modes.some((m) => m.est_detail)
+        ? modes
+        : [db.nouveauDetail(prix, db.state.seq.conditionnement++)]
+    }
+
+    Object.assign(p, champs)
     return ok(db.serializeProduit(p))
   }),
 
@@ -244,6 +432,7 @@ export const handlers = [
   }),
 
   // ── produits/{id}/reapprovisionner/ ────────────────────────
+  // { conditionnement?, quantite } → quantite += quantite × facteur
   http.post('*/api/produits/:id/reapprovisionner/', async ({ params, request }) => {
     const p = db.findProduit(params.id)
     if (!p) return fail(404, { detail: 'Non trouvé.' })
@@ -257,7 +446,22 @@ export const handlers = [
     if (!Number.isInteger(q) || q <= 0) {
       return fail(400, { quantite: ['Entier strictement positif attendu.'] })
     }
-    p.stock += q // opération atomique : une seule écriture
+    let facteur = 1
+    if (body.conditionnement !== undefined && body.conditionnement !== null && body.conditionnement !== '') {
+      const cond = normaliserProduit(p).conditionnements.find(
+        (m) => m.id === Number(body.conditionnement),
+      )
+      if (!cond || cond.actif === false) {
+        return fail(400, {
+          code: 'conditionnement_invalide',
+          detail: `Mode de vente invalide pour ${p.nom}.`,
+          produit: p.id,
+          conditionnement: body.conditionnement,
+        })
+      }
+      facteur = cond.facteur
+    }
+    p.quantite += q * facteur // opération atomique : une seule écriture
     return ok(db.serializeProduit(p))
   }),
 
@@ -304,30 +508,54 @@ export const handlers = [
       return fail(400, { lignes: ['Une vente doit contenir au moins une ligne.'] })
     }
 
-    // 1) Contrôle COMPLET avant toute écriture (atomicité du service creer_vente)
-    const besoin = new Map() // produitId → quantité totale
+    // 1) Résolution des lignes — AUCUNE écriture avant contrôle complet
+    //    (verrouillage logique : le service creer_vente est tout-ou-rien)
+    const resolues = [] // {produit, mode, quantite}
     for (const [i, l] of lignes.entries()) {
-      const produit = db.findProduit(l?.produit)
-      if (!produit) return fail(400, { lignes: [`Produit introuvable (ligne ${i + 1}).`] })
+      const brut = db.findProduit(l?.produit)
+      if (!brut) return fail(400, { lignes: [`Produit introuvable (ligne ${i + 1}).`] })
+      const produit = normaliserProduit(brut)
       const qte = Number(l?.quantite)
       if (!Number.isInteger(qte) || qte <= 0) {
         return fail(400, { lignes: [`Quantité invalide pour ${produit.nom}.`] })
       }
-      besoin.set(produit.id, (besoin.get(produit.id) || 0) + qte)
+      let cond = null
+      const refMode = l?.conditionnement
+      if (refMode !== undefined && refMode !== null && refMode !== '') {
+        cond = produit.conditionnements.find((m) => m.id === Number(refMode)) ?? null
+        if (!cond || cond.actif === false) {
+          return fail(400, {
+            code: 'conditionnement_invalide',
+            detail: `Mode de vente invalide pour ${produit.nom}.`,
+            produit: produit.id,
+            conditionnement: refMode,
+          })
+        }
+      } else {
+        cond = modeDetail(produit) // sans `conditionnement` = Détail
+      }
+      resolues.push({ brut, produit, cond, quantite: qte })
     }
-    for (const [pid, qte] of besoin) {
+
+    // 2) CUMUL du besoin en unités de base par produit, puis stock APRÈS cumul
+    const besoin = new Map()
+    for (const r of resolues) {
+      besoin.set(r.produit.id, (besoin.get(r.produit.id) ?? 0) + r.quantite * r.cond.facteur)
+    }
+    for (const [pid, demande] of besoin) {
       const produit = db.findProduit(pid)
-      if (produit.stock < qte) {
+      if (produit.quantite < demande) {
         return fail(409, {
           code: 'stock_insuffisant',
-          detail: `Stock insuffisant pour ${produit.nom} (disponible : ${produit.stock}, demandé : ${qte}).`,
+          detail: `Stock insuffisant pour ${produit.nom} (disponible : ${produit.quantite}, demandé : ${demande} unités).`,
           produit: produit.id,
-          stock_disponible: produit.stock,
+          demande_base: demande,
+          disponible_base: produit.quantite,
         })
       }
     }
 
-    // 2) Écriture : vente, lignes (prix figés), décroissance des stocks
+    // 3) Écriture : vente, lignes avec SNAPSHOT figés, décroissance des stocks
     const vente = {
       id: db.state.seq.vente++,
       date_vente: new Date().toISOString(),
@@ -337,20 +565,42 @@ export const handlers = [
     }
     db.state.ventes.push(vente)
     let total = 0
-    for (const [pid, qte] of besoin) {
-      const produit = db.findProduit(pid)
-      db.state.lignes.push({
+    const misAJour = new Map()
+    for (const r of resolues) {
+      const { brut, cond, quantite } = r
+      const quantiteBase = quantite * cond.facteur
+      const prixVente = cond.prix_vente // figé à la création
+      const ligne = {
         id: db.state.seq.ligne++,
         vente: vente.id,
-        produit: pid,
-        quantite: qte,
-        prix: produit.prix, // figé
-      })
-      produit.stock -= qte
-      total += qte * produit.prix
+        produit: brut.id,
+        conditionnement: cond.id ?? null,
+        libelle: cond.libelle,
+        facteur: cond.facteur,
+        est_detail: cond.est_detail === true || cond.facteur === 1,
+        prix: prixVente,
+        quantite,
+        quantite_base: quantiteBase,
+        cout_unitaire_base: brut.prix_achat,
+        total_ligne: quantite * prixVente,
+      }
+      db.state.lignes.push(ligne)
+      brut.quantite -= quantiteBase
+      total += ligne.total_ligne
+      misAJour.set(brut.id, brut.quantite)
     }
     vente.total = total
-    return created(db.serializeVenteDetail(vente))
+
+    // 4) Réponse du contrat (+ date_vente/client_nom : affichage ticket)
+    return created({
+      id: vente.id,
+      date_vente: vente.date_vente,
+      client_nom: vente.client_nom,
+      total: db.money(total),
+      moyen_paiement: mode,
+      lignes: db.state.lignes.filter((l) => l.vente === vente.id).map(db.serializeLigne),
+      produits_mis_a_jour: [...misAJour.entries()].map(([id, quantite]) => ({ id, quantite })),
+    })
   }),
 
   http.get('*/api/ventes/:id/', ({ params }) => {
@@ -401,11 +651,11 @@ export const handlers = [
 
     // produits à racheter : état instantané des stocks (stock <= seuil)
     const alertes = db.state.produits
-      .filter((p) => p.stock <= p.seuil)
-      .sort((a, b) => a.stock - b.stock)
+      .filter((p) => p.quantite <= p.seuil_alerte)
+      .sort((a, b) => a.quantite - b.quantite)
       .map((p) => ({
         produit: p.id, code: p.code, nom: p.nom,
-        stock: p.stock, seuil_alerte: p.seuil, en_rupture: p.stock === 0,
+        stock: p.quantite, seuil_alerte: p.seuil_alerte, en_rupture: p.quantite === 0,
       }))
 
     return ok({
@@ -463,9 +713,9 @@ export const handlers = [
     const produits = db.state.produits
     const stock = {
       nb_produits: produits.length,
-      nb_en_alerte: produits.filter((p) => p.stock <= p.seuil).length,
-      nb_en_rupture: produits.filter((p) => p.stock === 0).length,
-      valeur_stock: db.money(produits.reduce((s, p) => s + p.prix * p.stock, 0)),
+      nb_en_alerte: produits.filter((p) => p.quantite <= p.seuil_alerte).length,
+      nb_en_rupture: produits.filter((p) => p.quantite === 0).length,
+      valeur_stock: db.money(produits.reduce((s, p) => s + p.prix * p.quantite, 0)),
     }
 
     // 5 dernières ventes : globales, indépendantes du paramètre `date`

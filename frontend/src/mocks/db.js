@@ -1,14 +1,19 @@
 /**
  * Base de données factice (état en mémoire) — MSW.
- * Fidèle à docs/API_CONTRACT.md et à modelisation_base_de_donnees.md :
- * les ventes baissent réellement les stocks, prix figés à la création.
+ * Contrat « modes de vente » : UN stock par produit en unités de base
+ * (`quantite`), prix du Détail dans `prix`, coût d'unité dans `prix_achat`,
+ * modes dans `conditionnements[]`. Les ventes baissent réellement les stocks,
+ * prix et mode figés à la création (snapshots).
  *
  * Historique : 30 jours de ventes générées de façon déterministe (PRNG
  * mulberry32, graine fixe) à partir des produits du catalogue — cela alimente
  * le tableau de bord (série 7 jours, top semaine, dernières ventes).
  * Les stocks ci-dessous sont l'état COURANT : l'historique ne les modifie pas.
+ * Les lignes d'historique sont de l'ancien format (sans snapshot) : le
+ * sérialiseur les normalise (« Détail », facteur 1, quantite_base = quantite).
  */
 import { dateDakar, decaleJours } from '../lib/dates.js'
+import { normaliserProduit } from '../lib/conditionnements.js'
 
 /** PRNG déterministe (mulberry32) : même séquence à chaque chargement. */
 function mulberry32(seed) {
@@ -120,54 +125,70 @@ const CATEGORIES = [
 ]
 
 /**
- * Catalogue étendu orienté démonstration : mix alimentaire + matériels domestiques.
- * Les `seuil` permettent d’exercer plusieurs scénarios de stock bas/rupture
- * dans l’interface (alerte, rupture, dashboard, réapprovisionnement).
+ * Catalogue orienté démonstration. Champs du contrat :
+ * `unite_base`, `prix_achat` (coût d'UNE unité de base), `quantite` (stock en
+ * unités de base), `seuil_alerte`, `prix` (mode Détail) et, pour la démo des
+ * conditionnements, `conditionnements` sur COLA / EAU15 / SAVON. Les autres
+ * produits n'ont pas de modes enregistrés : la lecture dérive un Détail de `prix`.
+ * Les `seuil_alerte` permettent d’exercer stock bas / rupture dans l’interface.
  */
 const PRODUITS = [
   // Épicerie
-  { id: 1, code: 'RIZ25', nom: 'Riz parfumé 25 kg', categorie: 1, prix: 15500, stock: 8, seuil: 5 },
-  { id: 2, code: 'HUILE5', nom: 'Huile 5 L', categorie: 1, prix: 6200, stock: 4, seuil: 6 },
-  { id: 3, code: 'SUCRE1', nom: 'Sucre 1 kg', categorie: 1, prix: 750, stock: 30, seuil: 12 },
-  { id: 4, code: 'LAIT400', nom: 'Lait en poudre 400 g', categorie: 1, prix: 2750, stock: 10, seuil: 4 },
-  { id: 5, code: 'CAFE', nom: 'Café Touba 250 g', categorie: 1, prix: 1200, stock: 15, seuil: 7 },
-  { id: 6, code: 'GRAINS', nom: 'Grains de mil 5 kg', categorie: 1, prix: 3900, stock: 17, seuil: 8 },
+  { id: 1, code: 'RIZ25', nom: 'Riz parfumé 25 kg', categorie: 1, unite_base: 'sac', prix_achat: 13000, prix: 15500, quantite: 8, seuil_alerte: 5 },
+  { id: 2, code: 'HUILE5', nom: 'Huile 5 L', categorie: 1, unite_base: 'unité', prix_achat: 5200, prix: 6200, quantite: 4, seuil_alerte: 6 },
+  { id: 3, code: 'SUCRE1', nom: 'Sucre 1 kg', categorie: 1, unite_base: 'sachet', prix_achat: 620, prix: 750, quantite: 30, seuil_alerte: 12 },
+  { id: 4, code: 'LAIT400', nom: 'Lait en poudre 400 g', categorie: 1, unite_base: 'boîte', prix_achat: 2300, prix: 2750, quantite: 10, seuil_alerte: 4 },
+  { id: 5, code: 'CAFE', nom: 'Café Touba 250 g', categorie: 1, unite_base: 'boîte', prix_achat: 980, prix: 1200, quantite: 15, seuil_alerte: 7 },
+  { id: 6, code: 'GRAINS', nom: 'Grains de mil 5 kg', categorie: 1, unite_base: 'sac', prix_achat: 3200, prix: 3900, quantite: 17, seuil_alerte: 8 },
 
   // Boissons
-  { id: 7, code: 'BISSAP', nom: 'Jus de bissap 1 L', categorie: 2, prix: 1000, stock: 6, seuil: 8 },
-  { id: 8, code: 'EAU15', nom: 'Eau minérale 1,5 L', categorie: 2, prix: 350, stock: 40, seuil: 15 },
-  { id: 9, code: 'JUSOR', nom: 'Jus d’orange 1 L', categorie: 2, prix: 1200, stock: 23, seuil: 10 },
-  { id: 10, code: 'COLA', nom: 'Boisson gazeuse 1,5 L', categorie: 2, prix: 1500, stock: 18, seuil: 9 },
+  { id: 7, code: 'BISSAP', nom: 'Jus de bissap 1 L', categorie: 2, unite_base: 'bouteille', prix_achat: 800, prix: 1000, quantite: 6, seuil_alerte: 8 },
+  { id: 8, code: 'EAU15', nom: 'Eau minérale 1,5 L', categorie: 2, unite_base: 'bouteille', prix_achat: 250, prix: 350, quantite: 40, seuil_alerte: 15,
+    conditionnements: [
+      { id: 4, libelle: 'Détail', facteur: 1, prix_vente: 350, code: '', est_detail: true, actif: true, ordre: 0 },
+      { id: 5, libelle: 'Pack', facteur: 6, prix_vente: 1900, code: 'EAU6', est_detail: false, actif: true, ordre: 1 },
+    ] },
+  { id: 9, code: 'JUSOR', nom: 'Jus d’orange 1 L', categorie: 2, unite_base: 'bouteille', prix_achat: 950, prix: 1200, quantite: 23, seuil_alerte: 10 },
+  { id: 10, code: 'COLA', nom: 'Boisson gazeuse 1,5 L', categorie: 2, unite_base: 'bouteille', prix_achat: 1083.33, prix: 1500, quantite: 30, seuil_alerte: 9,
+    conditionnements: [
+      { id: 1, libelle: 'Détail', facteur: 1, prix_vente: 1500, code: '', est_detail: true, actif: true, ordre: 0 },
+      { id: 2, libelle: 'Demi-carton', facteur: 6, prix_vente: 8000, code: 'COLA6', est_detail: false, actif: true, ordre: 1 },
+      { id: 3, libelle: 'Carton', facteur: 12, prix_vente: 15000, code: 'COLA12', est_detail: false, actif: true, ordre: 2 },
+    ] },
 
   // Hygiène / entretien
-  { id: 11, code: 'SAVON', nom: 'Savon de Marseille', categorie: 3, prix: 400, stock: 20, seuil: 9 },
-  { id: 12, code: 'JAVEL', nom: 'Eau de Javel 1 L', categorie: 3, prix: 600, stock: 0, seuil: 3 },
-  { id: 13, code: 'DETERG', nom: 'Détergent liquide 2 L', categorie: 3, prix: 1800, stock: 12, seuil: 5 },
-  { id: 14, code: 'PAPIER', nom: 'Papier toilette 12 rouleaux', categorie: 3, prix: 2500, stock: 9, seuil: 4 },
+  { id: 11, code: 'SAVON', nom: 'Savon de Marseille', categorie: 3, unite_base: 'pièce', prix_achat: 300, prix: 400, quantite: 20, seuil_alerte: 9,
+    conditionnements: [
+      { id: 6, libelle: 'Détail', facteur: 1, prix_vente: 400, code: '', est_detail: true, actif: true, ordre: 0 },
+      { id: 7, libelle: 'Carton', facteur: 24, prix_vente: 8500, code: 'SAVON24', est_detail: false, actif: true, ordre: 1 },
+    ] },
+  { id: 12, code: 'JAVEL', nom: 'Eau de Javel 1 L', categorie: 3, unite_base: 'bouteille', prix_achat: 480, prix: 600, quantite: 0, seuil_alerte: 3 },
+  { id: 13, code: 'DETERG', nom: 'Détergent liquide 2 L', categorie: 3, unite_base: 'bouteille', prix_achat: 1450, prix: 1800, quantite: 12, seuil_alerte: 5 },
+  { id: 14, code: 'PAPIER', nom: 'Papier toilette 12 rouleaux', categorie: 3, unite_base: 'paquet', prix_achat: 2000, prix: 2500, quantite: 9, seuil_alerte: 4 },
 
   // Électroménager
-  { id: 15, code: 'FAN', nom: 'Ventilateur de plafond', categorie: 4, prix: 24000, stock: 6, seuil: 3 },
-  { id: 16, code: 'BLENDER', nom: 'Blender 1,5 L', categorie: 4, prix: 19500, stock: 9, seuil: 4 },
-  { id: 17, code: 'PRESSE', nom: 'Cafetière électrique', categorie: 4, prix: 17500, stock: 5, seuil: 3 },
-  { id: 18, code: 'LAMPE', nom: 'Lampe LED 9 W', categorie: 4, prix: 3200, stock: 14, seuil: 6 },
+  { id: 15, code: 'FAN', nom: 'Ventilateur de plafond', categorie: 4, unite_base: 'pièce', prix_achat: 19500, prix: 24000, quantite: 6, seuil_alerte: 3 },
+  { id: 16, code: 'BLENDER', nom: 'Blender 1,5 L', categorie: 4, unite_base: 'pièce', prix_achat: 16000, prix: 19500, quantite: 9, seuil_alerte: 4 },
+  { id: 17, code: 'PRESSE', nom: 'Cafetière électrique', categorie: 4, unite_base: 'pièce', prix_achat: 14000, prix: 17500, quantite: 5, seuil_alerte: 3 },
+  { id: 18, code: 'LAMPE', nom: 'Lampe LED 9 W', categorie: 4, unite_base: 'pièce', prix_achat: 2600, prix: 3200, quantite: 14, seuil_alerte: 6 },
 
   // Bricolage
-  { id: 19, code: 'VIS', nom: 'Lot de vis 100 pcs', categorie: 5, prix: 1200, stock: 25, seuil: 10 },
-  { id: 20, code: 'SCIE', nom: 'Scie à métaux', categorie: 5, prix: 8500, stock: 7, seuil: 4 },
-  { id: 21, code: 'CLAMP', nom: 'Pince universelle', categorie: 5, prix: 2800, stock: 13, seuil: 6 },
-  { id: 22, code: 'NAS', nom: 'Nailon de fixation 3 mm', categorie: 5, prix: 1500, stock: 16, seuil: 8 },
+  { id: 19, code: 'VIS', nom: 'Lot de vis 100 pcs', categorie: 5, unite_base: 'pièce', prix_achat: 950, prix: 1200, quantite: 25, seuil_alerte: 10 },
+  { id: 20, code: 'SCIE', nom: 'Scie à métaux', categorie: 5, unite_base: 'pièce', prix_achat: 7000, prix: 8500, quantite: 7, seuil_alerte: 4 },
+  { id: 21, code: 'CLAMP', nom: 'Pince universelle', categorie: 5, unite_base: 'pièce', prix_achat: 2250, prix: 2800, quantite: 13, seuil_alerte: 6 },
+  { id: 22, code: 'NAS', nom: 'Nailon de fixation 3 mm', categorie: 5, unite_base: 'pièce', prix_achat: 1200, prix: 1500, quantite: 16, seuil_alerte: 8 },
 
   // Maison / décoration
-  { id: 23, code: 'CADDY', nom: 'Caddy de rangement', categorie: 6, prix: 7500, stock: 8, seuil: 4 },
-  { id: 24, code: 'TAPIS', nom: 'Tapis de salon 1,5 x 2 m', categorie: 6, prix: 32000, stock: 4, seuil: 2 },
-  { id: 25, code: 'LAMPON', nom: 'Lampe de table', categorie: 6, prix: 6000, stock: 11, seuil: 5 },
-  { id: 26, code: 'CORDE', nom: 'Corde à linge 20 m', categorie: 6, prix: 2100, stock: 18, seuil: 7 },
+  { id: 23, code: 'CADDY', nom: 'Caddy de rangement', categorie: 6, unite_base: 'pièce', prix_achat: 6100, prix: 7500, quantite: 8, seuil_alerte: 4 },
+  { id: 24, code: 'TAPIS', nom: 'Tapis de salon 1,5 x 2 m', categorie: 6, unite_base: 'pièce', prix_achat: 26500, prix: 32000, quantite: 4, seuil_alerte: 2 },
+  { id: 25, code: 'LAMPON', nom: 'Lampe de table', categorie: 6, unite_base: 'pièce', prix_achat: 4900, prix: 6000, quantite: 11, seuil_alerte: 5 },
+  { id: 26, code: 'CORDE', nom: 'Corde à linge 20 m', categorie: 6, unite_base: 'pièce', prix_achat: 1700, prix: 2100, quantite: 18, seuil_alerte: 7 },
 ]
 
 const HISTO = genererHistorique(PRODUITS)
 
 export const state = {
-  seq: { categorie: 7, produit: 27, vente: HISTO.seqVente, ligne: HISTO.seqLigne },
+  seq: { categorie: 7, produit: 27, vente: HISTO.seqVente, ligne: HISTO.seqLigne, conditionnement: 8 },
   categories: CATEGORIES,
   produits: PRODUITS,
   ventes: HISTO.ventes,
@@ -183,17 +204,44 @@ export const serializeCategorie = (c) => ({
   description: c.description ?? '',
 })
 
-export const serializeProduit = (p) => ({
-  id: p.id,
-  code: p.code,
-  nom: p.nom,
-  categorie: p.categorie,
-  categorie_nom: findCategorie(p.categorie)?.nom ?? '',
-  prix_unitaire: money(p.prix),
-  stock: p.stock,
-  seuil_alerte: p.seuil,
-  est_en_alerte: p.stock <= p.seuil,
+/**
+ * Mode de vente → contrat (DecimalField en chaîne, cf. `money`).
+ * @param {import('../lib/conditionnements.js').Conditionnement} m
+ */
+export const serializeConditionnement = (m) => ({
+  id: m.id ?? null,
+  libelle: m.libelle,
+  facteur: m.facteur,
+  prix_vente: money(m.prix_vente),
+  code: m.code ?? '',
+  est_detail: m.est_detail === true,
+  actif: m.actif !== false,
+  ordre: m.ordre ?? 0,
 })
+
+/**
+ * Produit → contrat : champs du contrat + dénormalisations d'affichage
+ * (`categorie_nom`, `est_en_alerte`). Un produit sans `conditionnements`
+ * reçoit un Détail dérivé de `prix` (normaliserProduit).
+ * @param {any} p
+ */
+export const serializeProduit = (p) => {
+  const n = normaliserProduit(p)
+  return {
+    id: n.id,
+    code: n.code,
+    nom: n.nom,
+    categorie: n.categorie,
+    categorie_nom: findCategorie(n.categorie)?.nom ?? '',
+    unite_base: n.unite_base,
+    prix_achat: money(n.prix_achat),
+    quantite: n.quantite,
+    seuil_alerte: n.seuil_alerte,
+    prix: money(n.prix),
+    conditionnements: n.conditionnements.map(serializeConditionnement),
+    est_en_alerte: n.quantite <= n.seuil_alerte,
+  }
+}
 
 export const serializeVente = (v) => ({
   id: v.id,
@@ -203,16 +251,41 @@ export const serializeVente = (v) => ({
   montant_total: money(v.total),
 })
 
+/**
+ * Ligne de vente → contrat avec SNAPSHOT complet.
+ * Anciennes lignes (historique) : libellé « Détail », facteur 1,
+ * `quantite_base = quantite`, coût d'achat courant du produit.
+ * @param {any} l
+ */
 export const serializeLigne = (l) => {
   const pr = findProduit(l.produit)
+  const facteur = Number.isInteger(l.facteur) ? l.facteur : 1
+  const quantite = Number(l.quantite) || 0
+  const prixVente = Number(l.prix) || 0
+  const estDetail = l.est_detail ?? facteur === 1
+  const total = Number.isFinite(Number(l.total_ligne))
+    ? Number(l.total_ligne)
+    : quantite * prixVente
+  const cout =
+    l.cout_unitaire_base !== undefined && l.cout_unitaire_base !== null
+      ? Number(l.cout_unitaire_base)
+      : pr?.prix_achat
   return {
     id: l.id,
     produit: l.produit,
     produit_nom: pr?.nom ?? '',
     produit_code: pr?.code ?? '',
-    quantite: l.quantite,
-    prix_unitaire: money(l.prix),
-    montant_ligne: money(l.quantite * l.prix),
+    conditionnement: l.conditionnement ?? null,
+    libelle: l.libelle ?? (estDetail ? 'Détail' : `×${facteur}`),
+    facteur,
+    est_detail: estDetail,
+    prix_unitaire: money(prixVente),
+    quantite,
+    quantite_base: Number.isInteger(l.quantite_base) ? l.quantite_base : quantite * facteur,
+    cout_unitaire_base: cout === undefined || cout === null || Number.isNaN(cout) ? null : money(cout),
+    total_ligne: money(total),
+    // @alias legacy (API historique)
+    montant_ligne: money(total),
   }
 }
 
@@ -220,3 +293,29 @@ export const serializeVenteDetail = (v) => ({
   ...serializeVente(v),
   lignes: state.lignes.filter((l) => l.vente === v.id).map(serializeLigne),
 })
+
+/**
+ * Nouveau Détail (facteur 1, aucun code) — utilisé à la création de produit
+ * et pour maintenir un Détail à partir de `prix` (ancien format).
+ * @param {number} prix prix du mode Détail
+ * @param {number|null} [id]
+ */
+export const nouveauDetail = (prix, id = null) => ({
+  id,
+  libelle: 'Détail',
+  facteur: 1,
+  prix_vente: Number(prix) || 0,
+  code: '',
+  est_detail: true,
+  actif: true,
+  ordre: 0,
+})
+
+/** Tous les modes de vente de tous les produits (id → {produit, mode}). */
+export function tousLesModes() {
+  const sortie = []
+  for (const p of state.produits) {
+    for (const m of p.conditionnements ?? []) sortie.push({ produit: p, mode: m })
+  }
+  return sortie
+}

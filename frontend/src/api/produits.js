@@ -52,14 +52,19 @@ export function deleteProduit(id) {
 }
 
 /**
- * Réapprovisionne un produit : stock += quantite (opération atomique).
+ * Réapprovisionne un produit : quantite += quantite × facteur (atomique).
+ * Sans `conditionnement`, le mode est le Détail (facteur 1).
  * @param {number} id
- * @param {number} quantite entier strictement > 0
+ * @param {number} quantite entier strictement > 0, en unités du mode reçu
+ *   (le service multiplie par `facteur` avant d'ajouter au stock)
+ * @param {number|null} [conditionnement] id du mode de vente reçu
  * @returns {Promise<import('./types.js').Produit>} produit à jour
  */
-export function reapprovisionnerProduit(id, quantite) {
+export function reapprovisionnerProduit(id, quantite, conditionnement = null) {
   return request(`produits/${id}/reapprovisionner/`, {
     method: 'POST',
-    body: { quantite },
+    body: conditionnement === null || conditionnement === undefined
+      ? { quantite }
+      : { quantite, conditionnement },
   }).then(norm)
 }
