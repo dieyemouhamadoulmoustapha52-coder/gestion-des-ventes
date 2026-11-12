@@ -28,22 +28,25 @@ export async function getProduit(id) {
 }
 
 /**
- * @param {{code: string, nom: string, categorie: number, prix_unitaire: number,
- *          stock?: number, seuil_alerte?: number}} data
+ * Crée un produit (contrat complet : `conditionnements` = liste des modes,
+ * sans `id` — le service attribue les identifiants).
+ * @param {object} data {code, nom, categorie, unite_base, prix_achat, prix,
+ *   quantite, seuil_alerte, conditionnements}
  * @returns {Promise<import('./types.js').Produit>}
  */
 export function createProduit(data) {
-  return request('produits/', { method: 'POST', body: data })
+  return request('produits/', { method: 'POST', body: data }).then(norm)
 }
 
 /**
+ * Remplace un produit : PUT complet, la liste `conditionnements` est
+ * intégralement remplacée (absent = mode retiré → inactif).
  * @param {number} id
- * @param {Partial<{code: string, nom: string, categorie: number,
- *        prix_unitaire: number, stock: number, seuil_alerte: number}>} data
- * @returns {Promise<import('./types.js').Produit>} PATCH partiel
+ * @param {object} data même forme que {@link createProduit}
+ * @returns {Promise<import('./types.js').Produit>}
  */
 export function updateProduit(id, data) {
-  return request(`produits/${id}/`, { method: 'PATCH', body: data })
+  return request(`produits/${id}/`, { method: 'PUT', body: data }).then(norm)
 }
 
 /** @param {number} id @returns {Promise<null>} 204 — 409 si produit vendu (PROTECT) */

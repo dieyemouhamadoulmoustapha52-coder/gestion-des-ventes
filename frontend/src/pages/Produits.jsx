@@ -14,7 +14,7 @@ import EmptyState from '../components/EmptyState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
 import Modal from '../components/Modal.jsx'
 import Pagination from '../components/Pagination.jsx'
-import ProduitModal from '../components/ProduitModal.jsx'
+import ProduitForm from '../components/ProduitForm.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { useCategories, useDeleteProduit, useProduits, useReapprovisionnerProduit } from '../hooks/queries.js'
@@ -148,178 +148,184 @@ export default function Produits() {
             <Tags size={16} aria-hidden="true" />
             Catégories
           </Button>
-          <Button onClick={() => setModal('create')}>
+          <Button onClick={() => setModal('create')} disabled={modal !== null}>
             <Plus size={16} aria-hidden="true" />
             Nouveau produit
           </Button>
         </div>
       </div>
 
-      {/* Filtres */}
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <label htmlFor="prod-search" className="sr-only">
-            Rechercher un produit
-          </label>
-          <Search
-            size={18}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            aria-hidden="true"
-          />
-          <input
-            id="prod-search"
-            type="search"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setPage(1)
-            }}
-            placeholder="Rechercher par nom ou code…"
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm"
-          />
-        </div>
-        <div>
-          <label htmlFor="prod-cat" className="sr-only">
-            Filtrer par catégorie
-          </label>
-          <select
-            id="prod-cat"
-            value={categorie}
-            onChange={(e) => {
-              setCategorie(e.target.value)
-              setPage(1)
-            }}
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-56"
-          >
-            <option value="">Toutes les catégories</option>
-            {catList.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nom}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* États */}
-      {produits.isError && !produits.data ? (
-        <ErrorState message={produits.error.detail} onRetry={() => produits.refetch()} />
-      ) : produits.isPending ? (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full">
-            <tbody className="divide-y divide-slate-100">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <RowSkeleton key={i} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : count === 0 ? (
-        <EmptyState
-          icon={Package}
-          title={hasFilters ? 'Aucun résultat' : 'Aucun produit'}
-          message={
-            hasFilters
-              ? 'Aucun produit ne correspond à votre recherche.'
-              : 'Commencez par créer des catégories, puis vos premiers produits.'
-          }
-          action={
-            hasFilters ? (
-              <Button variant="secondary" onClick={resetFilters}>
-                Réinitialiser les filtres
-              </Button>
-            ) : (
-              <Button onClick={() => setModal('create')}>
-                <Plus size={16} aria-hidden="true" />
-                Créer un produit
-              </Button>
-            )
-          }
+      {modal !== null ? (
+        <ProduitForm
+          produit={modal === 'create' ? null : modal}
+          categories={catList}
+          codesProduits={(produits.data?.results ?? []).map((p) => p.code)}
+          onClose={() => setModal(null)}
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th scope="col" className="px-4 py-3">Code</th>
-                  <th scope="col" className="px-4 py-3">Nom</th>
-                  <th scope="col" className="px-4 py-3">Catégorie</th>
-                  <th scope="col" className="px-4 py-3">Prix</th>
-                  <th scope="col" className="px-4 py-3">Stock</th>
-                  <th scope="col" className="px-4 py-3">Seuil</th>
-                  <th scope="col" className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
+        <>
+        {/* Filtres */}
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <label htmlFor="prod-search" className="sr-only">
+              Rechercher un produit
+            </label>
+            <Search
+              size={18}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              aria-hidden="true"
+            />
+            <input
+              id="prod-search"
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              placeholder="Rechercher par nom ou code…"
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="prod-cat" className="sr-only">
+              Filtrer par catégorie
+            </label>
+            <select
+              id="prod-cat"
+              value={categorie}
+              onChange={(e) => {
+                setCategorie(e.target.value)
+                setPage(1)
+              }}
+              className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm sm:w-56"
+            >
+              <option value="">Toutes les catégories</option>
+              {catList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* États */}
+        {produits.isError && !produits.data ? (
+          <ErrorState message={produits.error.detail} onRetry={() => produits.refetch()} />
+        ) : produits.isPending ? (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <table className="w-full">
               <tbody className="divide-y divide-slate-100">
-                {produits.data.results.map((p) => (
-                  <tr key={p.id} className="transition-colors duration-200 ease-in-out">
-                    <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.code}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{p.nom}</td>
-                    <td className="px-4 py-3 text-slate-600">{p.categorie_nom}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-900">
-                      {formatFcfa(p.prix_unitaire)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900">{p.stock}</span>
-                        {p.stock === 0 ? (
-                          <Badge tone="red">Rupture</Badge>
-                        ) : p.est_en_alerte ? (
-                          <Badge tone="orange">Stock bas</Badge>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{p.seuil_alerte}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setReappro(p)}
-                          aria-label={`Réapprovisionner ${p.nom}`}
-                          className="flex h-11 w-11 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50"
-                        >
-                          <PackagePlus size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setModal(p)}
-                          aria-label={`Modifier ${p.nom}`}
-                          className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
-                        >
-                          <Pencil size={16} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setToDelete(p)}
-                          aria-label={`Supprimer ${p.nom}`}
-                          className="flex h-11 w-11 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
-                        >
-                          <Trash2 size={16} aria-hidden="true" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <RowSkeleton key={i} />
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            count={count}
-            onChange={setPage}
+        ) : count === 0 ? (
+          <EmptyState
+            icon={Package}
+            title={hasFilters ? 'Aucun résultat' : 'Aucun produit'}
+            message={
+              hasFilters
+                ? 'Aucun produit ne correspond à votre recherche.'
+                : 'Commencez par créer des catégories, puis vos premiers produits.'
+            }
+            action={
+              hasFilters ? (
+                <Button variant="secondary" onClick={resetFilters}>
+                  Réinitialiser les filtres
+                </Button>
+              ) : (
+                <Button onClick={() => setModal('create')}>
+                  <Plus size={16} aria-hidden="true" />
+                  Créer un produit
+                </Button>
+              )
+            }
           />
-        </div>
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th scope="col" className="px-4 py-3">Code</th>
+                    <th scope="col" className="px-4 py-3">Nom</th>
+                    <th scope="col" className="px-4 py-3">Catégorie</th>
+                    <th scope="col" className="px-4 py-3">Prix</th>
+                    <th scope="col" className="px-4 py-3">Stock</th>
+                    <th scope="col" className="px-4 py-3">Seuil</th>
+                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {produits.data.results.map((p) => (
+                    <tr key={p.id} className="transition-colors duration-200 ease-in-out">
+                      <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.code}</td>
+                      <td className="px-4 py-3 font-medium text-slate-900">{p.nom}</td>
+                      <td className="px-4 py-3 text-slate-600">{p.categorie_nom}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-900">
+                        {formatFcfa(p.prix_unitaire)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-900">{p.stock}</span>
+                          {p.stock === 0 ? (
+                            <Badge tone="red">Rupture</Badge>
+                          ) : p.est_en_alerte ? (
+                            <Badge tone="orange">Stock bas</Badge>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{p.seuil_alerte}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setReappro(p)}
+                            aria-label={`Réapprovisionner ${p.nom}`}
+                            className="flex h-11 w-11 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50"
+                          >
+                            <PackagePlus size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setModal(p)}
+                            aria-label={`Modifier ${p.nom}`}
+                            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+                          >
+                            <Pencil size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setToDelete(p)}
+                            aria-label={`Supprimer ${p.nom}`}
+                            className="flex h-11 w-11 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                          >
+                            <Trash2 size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              count={count}
+              onChange={setPage}
+            />
+          </div>
+        )}
+
+        </>
       )}
 
       {/* Modales */}
-      <ProduitModal
-        open={modal !== null}
-        produit={modal === 'create' ? null : modal}
-        categories={catList}
-        onClose={() => setModal(null)}
-      />
       <Modal
         open={Boolean(reappro)}
         title={`Réapprovisionner — ${reappro?.nom ?? ''}`}
