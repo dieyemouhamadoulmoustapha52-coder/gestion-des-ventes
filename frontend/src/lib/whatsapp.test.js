@@ -65,6 +65,34 @@ describe('construireTexte', () => {
     expect(t).toContain('Tél. +221 77 000 00 00')
   })
 
+  it('mentionne le mode de vente des lignes (jamais au Détail)', () => {
+    const avecModes = {
+      ...vente,
+      lignes: [
+        {
+          produit_nom: 'COLA',
+          quantite: 2,
+          montant_ligne: 30000,
+          libelle: 'Carton',
+          facteur: 12,
+          est_detail: false,
+        },
+        {
+          produit_nom: 'EAU',
+          quantite: 3,
+          montant_ligne: 1500,
+          libelle: 'Détail',
+          facteur: 1,
+          est_detail: true,
+        },
+      ],
+    }
+    const t = construireTexte(avecModes, boutique)
+    expect(t).toContain('COLA ×2 Carton (12) — ')
+    expect(t).toContain('EAU ×3 — ')
+    expect(t).not.toContain('EAU ×3 Détail')
+  })
+
   it('tronque proprement sous la limite avec « … + N autres articles »', () => {
     const nombreuses = {
       ...vente,

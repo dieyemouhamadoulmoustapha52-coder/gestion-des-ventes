@@ -5,6 +5,7 @@
  * de formules, échappement des guillemets. Aucune bibliothèque.
  */
 import { dateHeureDakar, FUSEAU } from './dates.js'
+import { libelleLigneMode } from './conditionnements.js'
 import { toNumber } from './money.js'
 
 /** Colonnes du fichier (ordre imposé par le cahier des charges). */
@@ -48,7 +49,9 @@ function heureFr(iso) {
  * Construit le contenu complet du CSV (BOM inclus, lignes CRLF).
  * @param {Array<{id: number, date_vente: string, client_nom?: string,
  *                mode_paiement?: string, montant_total: number|string,
- *                lignes?: Array<{produit_nom: string, quantite: number}>}>} ventes
+ *                lignes?: Array<{produit_nom: string, quantite: number,
+ *                                libelle?: string, facteur?: number,
+ *                                est_detail?: boolean}>}>} ventes
  *   jeu filtré COMPLET (pas seulement une page)
  * @param {Record<string, string>} [modeLabels] libellés des moyens de paiement
  * @returns {string}
@@ -57,7 +60,10 @@ export function genererCsvVentes(ventes, modeLabels = {}) {
   const lignes = [COLONNES_CSV.map(echapperCellule).join(';')]
   for (const v of ventes ?? []) {
     const articles = (v.lignes ?? [])
-      .map((l) => `${l.produit_nom} ×${Number(l.quantite) || 0}`)
+      .map((l) => {
+        const mode = libelleLigneMode(l) // « Carton (12) », vide au Détail
+        return `${l.produit_nom} ×${Number(l.quantite) || 0}${mode ? ` ${mode}` : ''}`
+      })
       .join(' ; ')
     const cells = [
       String(v.id ?? ''),

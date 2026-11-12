@@ -7,6 +7,7 @@ import { Printer, X } from 'lucide-react'
 import Button from './Button.jsx'
 import WhatsappIcon from './WhatsappIcon.jsx'
 import { DEFAULT_BOUTIQUE } from '../config/boutique.js'
+import { libelleLigneMode } from '../lib/conditionnements.js'
 import { MODE_LABELS } from '../lib/constants.js'
 import { dateHeureDakar } from '../lib/dates.js'
 import { formatFcfa, toNumber } from '../lib/money.js'
@@ -71,17 +72,29 @@ export default function Ticket({ vente, boutique = {}, onFermer }) {
         </div>
 
         <div className="ticket-lignes" aria-label="Détail des articles vendus">
-          {lignes.map((l) => (
-            <div key={l.id} className="ticket-ligne">
-              <p className="ticket-ligne-nom">{l.produit_nom}</p>
-              <div className="ticket-ligne-meta">
-                <span>
-                  {l.quantite} × {formatFcfa(l.prix_unitaire)}
-                </span>
-                <span>{formatFcfa(l.montant_ligne)}</span>
+          {lignes.map((l) => {
+            const mode = libelleLigneMode(l) // « Carton (12) », vide au Détail
+            const base = Number(l.quantite_base)
+            return (
+              <div key={l.id} className="ticket-ligne">
+                <p className="ticket-ligne-nom">{l.produit_nom}</p>
+                <div className="ticket-ligne-meta">
+                  <span>
+                    {l.quantite} × {formatFcfa(l.prix_unitaire)}
+                  </span>
+                  <span>{formatFcfa(l.montant_ligne)}</span>
+                </div>
+                {mode && base > 0 ? (
+                  <div className="ticket-ligne-meta">
+                    <span>
+                      {mode} — {base} unité{base > 1 ? 's' : ''}
+                    </span>
+                    <span aria-hidden="true" />
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="ticket-rule">-----</div>

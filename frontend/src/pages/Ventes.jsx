@@ -22,6 +22,7 @@ import { useBoutique } from '../config/boutique.js'
 import { useProduitsGrille, useTotauxVentes, useVente, useVentes } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
 import { dateDakar, decaleJours, FUSEAU } from '../lib/dates.js'
+import { libelleLigneMode } from '../lib/conditionnements.js'
 import { genererCsvVentes, nomFichierCsv, telechargerCsv } from '../lib/exportCsv.js'
 import { formatFcfa } from '../lib/money.js'
 import { useDebouncedValue } from '../lib/useDebounce.js'
@@ -480,19 +481,29 @@ export default function Ventes() {
                 {detail.data.lignes.length} ligne{detail.data.lignes.length > 1 ? 's' : ''}
               </h3>
               <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200">
-                {detail.data.lignes.map((l) => (
-                  <li key={l.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
-                    <div>
-                      <p className="font-medium text-slate-900">{l.produit_nom}</p>
-                      <p className="text-xs text-slate-500">
-                        {l.quantite} × {formatFcfa(l.prix_unitaire)} · {l.produit_code}
+                {detail.data.lignes.map((l) => {
+                  const mode = libelleLigneMode(l) // « Carton (12) », vide au Détail
+                  const base = Number(l.quantite_base)
+                  return (
+                    <li key={l.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-medium text-slate-900">{l.produit_nom}</p>
+                        <p className="text-xs text-slate-500">
+                          {l.quantite} × {formatFcfa(l.prix_unitaire)} · {l.produit_code}
+                          {mode ? ` · ${mode}` : ''}
+                        </p>
+                        {mode && base > 0 ? (
+                          <p className="text-xs text-slate-400">
+                            soit {base} unité{base > 1 ? 's' : ''} de base
+                          </p>
+                        ) : null}
+                      </div>
+                      <p className="whitespace-nowrap font-semibold text-slate-900">
+                        {formatFcfa(l.montant_ligne)}
                       </p>
-                    </div>
-                    <p className="whitespace-nowrap font-semibold text-slate-900">
-                      {formatFcfa(l.montant_ligne)}
-                    </p>
-                  </li>
-                ))}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
 
