@@ -257,9 +257,9 @@ export default function Accueil() {
         />
         <StatCard
           icon={PackageCheck}
-          label="Valeur stock"
+          label="Valeur du stock"
           value={formatFcfa(data.stock.valeur_stock)}
-          detail={`${data.stock.nb_en_alerte} en alerte · ${data.stock.nb_en_rupture} rupture`}
+          detail={`Au coût d'achat · ${data.stock.nb_en_alerte} en alerte · ${data.stock.nb_en_rupture} rupture`}
           tone="text-amber-700"
         />
       </div>

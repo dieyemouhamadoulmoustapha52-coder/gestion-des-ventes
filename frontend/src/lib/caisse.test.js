@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculerMonnaie, filtrerProduits, topVendus } from './caisse.js'
+import { calculerMonnaie, filtrerProduits, resoudreCodeMode, topVendus } from './caisse.js'
 
 describe('calculerMonnaie', () => {
   it('champ vide → statut vide (encaissement autorisé)', () => {
@@ -60,6 +60,67 @@ describe('filtrerProduits', () => {
   it('conserve l’ordre d’origine et gère le tableau vide', () => {
     expect(filtrerProduits([], 'riz')).toEqual([])
     expect(filtrerProduits(produits, 'l').map((p) => p.id)).toEqual([2, 3])
+  })
+
+  it('filtre aussi sur les codes de mode (COLA12 remonte le produit)', () => {
+    const cola = {
+      id: 10,
+      nom: 'Coca-Cola 1,5 L',
+      code: 'COLA',
+      conditionnements: [
+        { id: 1, libelle: 'Détail', code: '', facteur: 1 },
+        { id: 6, libelle: 'Demi-carton', code: 'COLA6', facteur: 6 },
+        { id: 3, libelle: 'Carton', code: 'COLA12', facteur: 12 },
+      ],
+    }
+    const eau = { id: 11, nom: 'Eau minérale', code: 'EAU', conditionnements: [] }
+    expect(filtrerProduits([cola, eau], 'cola12').map((p) => p.id)).toEqual([10])
+    expect(filtrerProduits([cola, eau], 'COLA6').map((p) => p.id)).toEqual([10])
+    // produit sans conditionnements : pas d'erreur, filtrage nominal
+    expect(filtrerProduits([eau], 'EAU').map((p) => p.id)).toEqual([11])
+    expect(filtrerProduits([{ id: 1, nom: 'X', code: 'X' }], 'COLA12')).toEqual([])
+  })
+})
+
+describe('resoudreCodeMode', () => {
+  const cola = {
+    id: 10,
+    nom: 'Coca-Cola 1,5 L',
+    code: 'COLA',
+    conditionnements: [
+      { id: 1, libelle: 'Détail', code: '', facteur: 1 },
+      { id: 6, libelle: 'Demi-carton', code: 'COLA6', facteur: 6 },
+      { id: 3, libelle: 'Carton', code: 'COLA12', facteur: 12 },
+    ],
+  }
+  const eau = { id: 11, nom: 'Eau minérale', code: 'EAU', conditionnements: [] }
+
+  it('code exact → produit + mode correspondant (casse et espaces ignorés)', () => {
+    const attendu = { produit: cola, mode: cola.conditionnements[2] }
+    expect(resoudreCodeMode([cola, eau], 'COLA12')).toEqual(attendu)
+    expect(resoudreCodeMode([cola], ' cola12 ')).toEqual(attendu)
+    expect(resoudreCodeMode([cola], 'cola6')).toEqual({
+      produit: cola,
+      mode: cola.conditionnements[1],
+    })
+  })
+
+  it('code partiel, vide ou inconnu → null (le code produit ne répond pas)', () => {
+    expect(resoudreCodeMode([cola], 'COLA')).toBeNull()
+    expect(resoudreCodeMode([cola], '')).toBeNull()
+    expect(resoudreCodeMode([cola], '   ')).toBeNull()
+    expect(resoudreCodeMode([cola], 'COLA24')).toBeNull()
+    expect(resoudreCodeMode([], 'COLA12')).toBeNull()
+  })
+
+  it('le mode Détail (code vide) n’est jamais résolu par code', () => {
+    expect(resoudreCodeMode([cola], 'detail')).toBeNull()
+    expect(resoudreCodeMode([cola], '')).toBeNull()
+  })
+
+  it('produit sans conditionnements → null', () => {
+    expect(resoudreCodeMode([eau], 'EAU')).toBeNull()
+    expect(resoudreCodeMode([eau], 'COLA12')).toBeNull()
   })
 })
 

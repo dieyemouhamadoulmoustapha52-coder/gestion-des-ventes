@@ -17,7 +17,9 @@ import {
   SUGGESTIONS_MODE,
   SUGGESTIONS_UNITE,
   UNITE_MAX,
+  margeMode,
   normaliserProduit,
+  remiseVsDetail,
 } from '../lib/conditionnements.js'
 import { validerFormulaireProduit } from '../lib/formProduit.js'
 
@@ -398,13 +400,14 @@ export default function ProduitForm({ produit, categories, codesProduits = [], o
           ) : null}
 
           <div className="overflow-x-auto rounded-lg border border-slate-200">
-            <table className="w-full min-w-[36rem] text-left text-sm">
+            <table className="w-full min-w-[48rem] text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th scope="col" className="px-3 py-2">Libellé *</th>
                   <th scope="col" className="px-3 py-2">Unités / mode *</th>
                   <th scope="col" className="px-3 py-2">Prix (FCFA) *</th>
                   <th scope="col" className="px-3 py-2">Code</th>
+                  <th scope="col" className="px-3 py-2">Marge / remise</th>
                   <th scope="col" className="px-3 py-2 text-right">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -532,6 +535,36 @@ export default function ProduitForm({ produit, categories, codesProduits = [], o
                             ) : null}
                           </>
                         )}
+                      </td>
+                      <td className="px-3 py-2 align-top text-xs">
+                        {(() => {
+                          const coutUnite = Number(form.prix_achat) || 0
+                          const prixDuMode = estDetail
+                            ? Number(form.prix) || 0
+                            : Number(m.prix_vente) || 0
+                          const facteurDuMode = estDetail ? 1 : Number(m.facteur) || 1
+                          const marge = margeMode(prixDuMode, facteurDuMode, coutUnite)
+                          const remise = remiseVsDetail(prixDuMode, facteurDuMode, Number(form.prix) || 0)
+                          if (coutUnite <= 0 || prixDuMode <= 0) {
+                            return <span className="text-slate-400">—</span>
+                          }
+                          return (
+                            <>
+                              <span
+                                className={
+                                  marge >= 0 ? 'font-medium text-emerald-700' : 'font-medium text-red-600'
+                                }
+                              >
+                                Marge {formatFcfa(marge)}
+                              </span>
+                              {remise > 0 ? (
+                                <span className="block text-slate-500">
+                                  Remise {formatFcfa(remise)}
+                                </span>
+                              ) : null}
+                            </>
+                          )
+                        })()}
                       </td>
                       <td className="px-3 py-2 align-top">
                         <div className="flex h-11 items-center justify-end">

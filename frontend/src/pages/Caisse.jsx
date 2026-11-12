@@ -22,7 +22,7 @@ import { useCart } from '../context/CartContext.jsx'
 import { useMessages } from '../context/MessagesContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille, useVentes30Jours } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
-import { calculerMonnaie, filtrerProduits, topVendus } from '../lib/caisse.js'
+import { calculerMonnaie, filtrerProduits, resoudreCodeMode, topVendus } from '../lib/caisse.js'
 import { formatFcfa, toNumber } from '../lib/money.js'
 import {
   formaterStock,
@@ -112,8 +112,10 @@ export default function Caisse() {
       0,
     )
 
-  const addToCart = (p) => {
-    const dispo = maxQuantiteLigne(1, p.quantite, besoinProduit(p.id))
+  // Ajout au Détail par défaut ; un mode peut être imposé (code COLA12 → 1 carton).
+  const addToCart = (p, mode = modeDetail(p)) => {
+    const facteur = Math.max(1, Math.trunc(Number(mode?.facteur) || 1))
+    const dispo = maxQuantiteLigne(facteur, p.quantite, besoinProduit(p.id))
     if (dispo < 1) {
       toast.error(
         p.quantite <= 0
@@ -123,7 +125,7 @@ export default function Caisse() {
       return
     }
     setLineError(null)
-    cart.add(p, modeDetail(p)) // ajout par défaut au Détail (mode choisissable ensuite)
+    cart.add(p, mode)
   }
 
   // Option de la liste déroulante : clé de ligne ↔ mode du produit.
@@ -232,7 +234,14 @@ export default function Caisse() {
     if (e.key === 'Enter') {
       e.preventDefault()
       // Calcul synchrone sur la valeur courante : pas de résultat périmé.
-      const synchrones = search.trim() ? filtrerProduits(enCategorie, search) : []
+      const terme = search.trim()
+      // « COLA12 » + Entrée → 1 carton (le code de mode prime sur le produit)
+      const exact = terme ? resoudreCodeMode(enCategorie, terme) : null
+      if (exact) {
+        addToCart(exact.produit, exact.mode)
+        return
+      }
+      const synchrones = terme ? filtrerProduits(enCategorie, terme) : []
       const cible = synchrones[Math.min(highlight, synchrones.length - 1)]
       if (cible) addToCart(cible)
     } else if (e.key === 'ArrowDown') {
@@ -339,7 +348,7 @@ export default function Caisse() {
               <kbd className={KBD}>↓</kbd> parcourir les résultats
             </span>
             <span className="flex items-center gap-1.5">
-              <kbd className={KBD}>Entrée</kbd> ajouter le produit surligné
+              <kbd className={KBD}>Entrée</kbd> ajouter (COLA12 = 1 carton)
             </span>
             <span className="flex items-center gap-1.5">
               <kbd className={KBD}>Échap</kbd> vider la recherche

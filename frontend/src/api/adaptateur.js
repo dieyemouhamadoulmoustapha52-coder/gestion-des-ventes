@@ -6,8 +6,20 @@
  * Double travail :
  *  1. normalisation (Decimal DRF en chaîne → nombre, produits sans
  *     `conditionnements` → Détail dérivé via `normaliserProduit`) ;
- *  2. alias « legacy » (`prix_unitaire`, `stock`, `montant_total`…) conservés
- *     pour les écrans non encore migrés — `@alias` à supprimer à la migration.
+ *  2. lecture des DEUX formes de noms : contrat d'abord, API réelle en repli
+ *     — les alias (`@alias`) servent de pont dans les deux sens.
+ *
+ * ÉTAT DE L'API RÉELLE (backend/commerce/serializers.py + models.py, constaté
+ * le 12/11/2026) — divergences avec le contrat visé, à migrer backend-side :
+ *   produit : `prix_unitaire` (≠ `prix`), `stock` (≠ `quantite`),
+ *             `seuil_alerte` (≠ `seuil`) ; AUCUN `prix_achat`, `unite_base`
+ *             ni `conditionnements` (modes de vente absents du modèle) ;
+ *   ligne   : `montant_ligne` (≠ `total_ligne`) ;
+ *   vente   : `montant_total` (≠ `total`), `mode_paiement` (≠ `moyen_paiement`) ;
+ *   POST    : `mode_paiement` + `lignes[{produit, quantite}]` — pas de
+ *             `conditionnement` par ligne ;
+ *   reappro : `quantite` seul (pas de facteur × mode).
+ * Le retrait des `@alias` et des replis se fera au fil de sa migration.
  *
  * Les allers (corps POST/PUT) partent tels quels : les écrans envoient déjà
  * les noms du contrat.
@@ -80,16 +92,16 @@ export function versVueLigne(brut, enrichi = {}) {
 
 /**
  * Vente → objet vu par les écrans. Le contrat répond `total`/`moyen_paiement`
- * sur POST ; GET renvoie encore `montant_total`/`mode_paiement` : les deux
- * sont acceptés ici.
+ * ; l'API réelle renvoie encore `montant_total`/`mode_paiement` : contrat
+ * d'abord, l'API réelle en repli.
  * @param {any} brut
  * @param {Array<any>} [lignes]
  * @returns {any}
  */
 export function versVueVente(brut, lignes) {
   if (!brut || typeof brut !== 'object') return brut
-  const total = toNumber(brut.montant_total ?? brut.total)
-  const mode = brut.mode_paiement ?? brut.moyen_paiement ?? ''
+  const total = toNumber(brut.total ?? brut.montant_total)
+  const mode = brut.moyen_paiement ?? brut.mode_paiement ?? ''
   const vue = {
     ...brut,
     montant_total: total,

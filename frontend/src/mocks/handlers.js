@@ -726,8 +726,9 @@ export const handlers = [
       nb_produits: produits.length,
       nb_en_alerte: produits.filter((p) => p.quantite <= p.seuil_alerte).length,
       nb_en_rupture: produits.filter((p) => p.quantite === 0).length,
-      // Valeur au prix de VENTE détail × stock en unités de base.
-      valeur_stock: db.money(produits.reduce((s, p) => s + p.prix * p.quantite, 0)),
+      // Stock immobilisé : prix d'ACHAT × stock en unités de base
+      // (prix de vente × stock = surestimation).
+      valeur_stock: db.money(produits.reduce((s, p) => s + p.prix_achat * p.quantite, 0)),
     }
 
     // 5 dernières ventes : globales, indépendantes du paramètre `date`
