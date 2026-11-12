@@ -49,6 +49,24 @@ describe('genererCsvVentes', () => {
 
   const lignes = (csv) => csv.replace(/^﻿/, '').split('\r\n')
 
+  it('colonne Articles : mode de vente après la quantité, absent au Détail', () => {
+    const csv = genererCsvVentes([
+      {
+        id: 99,
+        date_vente: '2026-11-06T10:00:00+00:00',
+        client_nom: '',
+        mode_paiement: 'ESPECES',
+        montant_total: 31500,
+        lignes: [
+          { produit_nom: 'COLA', quantite: 2, libelle: 'Carton', facteur: 12, est_detail: false },
+          { produit_nom: 'EAU', quantite: 3, libelle: 'Détail', facteur: 1, est_detail: true },
+        ],
+      },
+    ])
+    expect(csv).toContain('COLA ×2 Carton (12) ; EAU ×3')
+    expect(csv).not.toContain('EAU ×3 Détail')
+  })
+
   it('commence par le BOM UTF-8 et finit par CRLF', () => {
     const csv = genererCsvVentes(ventes)
     expect(csv.charCodeAt(0)).toBe(0xfeff)

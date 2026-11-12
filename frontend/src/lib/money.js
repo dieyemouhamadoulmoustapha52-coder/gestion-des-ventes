@@ -24,3 +24,13 @@ export function toNumber(value) {
 export function formatFcfa(value) {
   return `${NF.format(Math.round(toNumber(value)))}\u00A0FCFA`
 }
+
+/**
+ * Nombre localisé SANS unité (listes denses : options de mode, tableaux).
+ * formatNombre(15000) → "15 000".
+ * @param {string|number|null|undefined} value
+ * @returns {string}
+ */
+export function formatNombre(value) {
+  return NF.format(Math.round(toNumber(value)))
+}

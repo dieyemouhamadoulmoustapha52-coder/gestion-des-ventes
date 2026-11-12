@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PANIER_MAX, paniersEtatInitial, paniersReducer } from './paniers.js'
+import { PANIER_MAX, ligneCle, paniersEtatInitial, paniersReducer } from './paniers.js'
 
 const produit = (id, stock = 10) => ({ id, stock, prix_unitaire: 100, nom: `P${id}` })
 const vide = () => paniersEtatInitial()
@@ -113,5 +113,119 @@ describe('paniersReducer — hydrate', () => {
     }
     const s = paniersReducer(vide(), { type: 'hydrate', state: restore })
     expect(s).toEqual(restore)
+  })
+})
+
+describe('paniersReducer — modes de vente', () => {
+  const cola = (stock = 30) => ({
+    id: 10,
+    stock,
+    prix_unitaire: 1500,
+    nom: 'COLA',
+    unite_base: 'bouteille',
+    conditionnements: [
+      { id: 1, libelle: 'Détail', facteur: 1, prix_vente: 1500, est_detail: true, actif: true },
+      { id: 2, libelle: 'Demi-carton', facteur: 6, prix_vente: 8000, est_detail: false, actif: true },
+      { id: 3, libelle: 'Carton', facteur: 12, prix_vente: 15000, est_detail: false, actif: true },
+    ],
+  })
+  const mode = (p, id) => p.conditionnements.find((m) => m.id === id)
+
+  it('ligneCle : le Détail a toujours la même clé', () => {
+    expect(ligneCle(10, null)).toBe('10:detail')
+    expect(ligneCle(10, mode(cola(), 1))).toBe('10:detail')
+    expect(ligneCle(10, mode(cola(), 3))).toBe('10:3')
+  })
+
+  it('add avec un mode crée une ligne distincte du Détail', () => {
+    const p = cola()
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p, mode: mode(p, 3) })
+    s = paniersReducer(s, { type: 'add', produit: p, mode: null })
+    expect(s.paniers[0].items).toHaveLength(2)
+    expect(s.paniers[0].items[0].conditionnement.id).toBe(3)
+    expect(s.paniers[0].items[1].conditionnement).toBeNull()
+    expect(s.paniers[0].items[0].quantite).toBe(1)
+    expect(s.paniers[0].items[1].quantite).toBe(1)
+  })
+
+  it('les bornes sont en unités de base (2 cartons max sur 30)', () => {
+    const p = cola(30)
+    let s = vide()
+    for (let i = 0; i < 4; i += 1) s = paniersReducer(s, { type: 'add', produit: p, mode: mode(p, 3) })
+    expect(s.paniers[0].items[0].quantite).toBe(2) // 2 × 12 = 24 ≤ 30
+
+    // le reste du stock (6) est disponible pour une ligne de détail
+    for (let i = 0; i < 10; i += 1) s = paniersReducer(s, { type: 'add', produit: p, mode: null })
+    const detail = s.paniers[0].items.find((i) => i.conditionnement === null)
+    expect(detail.quantite).toBe(6)
+  })
+
+  it('inc est borné par le mode de la ligne', () => {
+    const p = cola(30)
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p, mode: mode(p, 2) }) // demi-carton ×6
+    const cle = ligneCle(p.id, mode(p, 2))
+    for (let i = 0; i < 10; i += 1) s = paniersReducer(s, { type: 'inc', cle })
+    expect(s.paniers[0].items[0].quantite).toBe(5) // 5 × 6 = 30
+  })
+
+  it('changerMode re-borné, et fusion si la ligne cible existe', () => {
+    const p = cola(30)
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p, mode: null })
+    s = paniersReducer(s, { type: 'add', produit: p, mode: mode(p, 3) })
+    expect(s.paniers[0].items).toHaveLength(2)
+
+    s = paniersReducer(s, { type: 'mode', cle: ligneCle(p.id, mode(p, 3)), mode: null })
+    expect(s.paniers[0].items).toHaveLength(1)
+    expect(s.paniers[0].items[0].quantite).toBe(2) // 1 détail + 1 carton → 2 détails
+    expect(s.paniers[0].items[0].conditionnement).toBeNull()
+  })
+
+  it('changerMode vers un mode qui ne tient pas en stock → inchangé', () => {
+    const p = cola(11)
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p, mode: null })
+    for (let i = 0; i < 10; i += 1) s = paniersReducer(s, { type: 'inc', cle: ligneCle(p.id, null) })
+    expect(s.paniers[0].items[0].quantite).toBe(11)
+    s = paniersReducer(s, { type: 'mode', cle: ligneCle(p.id, null), mode: mode(p, 3) })
+    expect(s.paniers[0].items[0].conditionnement).toBeNull() // 12 > 11 : refusé
+    expect(s.paniers[0].items[0].quantite).toBe(11)
+  })
+
+  it('remove / dec ciblent la clé de ligne (produit + mode)', () => {
+    const p = cola()
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p, mode: mode(p, 3) })
+    s = paniersReducer(s, { type: 'add', produit: p, mode: null })
+    s = paniersReducer(s, { type: 'remove', cle: ligneCle(p.id, mode(p, 3)) })
+    expect(s.paniers[0].items).toHaveLength(1)
+    expect(s.paniers[0].items[0].conditionnement).toBeNull()
+  })
+})
+
+describe('paniersReducer — produits_mis_a_jour', () => {
+  it('stocks met à jour les snapshots de TOUS les paniers', () => {
+    const p = { id: 1, stock: 30, prix_unitaire: 100, nom: 'P1' }
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p })
+    s = paniersReducer(s, { type: 'ajouter' })
+    s = paniersReducer(s, { type: 'add', produit: p })
+    s = paniersReducer(s, {
+      type: 'stocks',
+      majs: [{ id: 1, quantite: 6 }],
+    })
+    expect(s.paniers[0].items[0].produit.quantite).toBe(6)
+    expect(s.paniers[0].items[0].produit.stock).toBe(6)
+    expect(s.paniers[1].items[0].produit.stock).toBe(6)
+  })
+
+  it('stocks sans correspondance → state inchangé', () => {
+    const p = { id: 1, stock: 30, prix_unitaire: 100, nom: 'P1' }
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p })
+    expect(paniersReducer(s, { type: 'stocks', majs: [] })).toBe(s)
+    expect(paniersReducer(s, { type: 'stocks', majs: [{ id: 99, quantite: 0 }] })).toBe(s)
   })
 })

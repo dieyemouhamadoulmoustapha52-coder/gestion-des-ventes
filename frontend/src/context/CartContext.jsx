@@ -10,12 +10,14 @@ import { useProduitsGrille } from '../hooks/queries.js'
 import { useMessages } from './MessagesContext.jsx'
 import {
   aDesLignes,
+  compterLignes,
   ecrireBrouillon,
   effacerBrouillon,
   lireBrouillon,
   revaliderBrouillon,
 } from '../lib/brouillon.js'
-import { paniersEtatInitial, paniersReducer } from '../lib/paniers.js'
+import { cleDeLigne, paniersEtatInitial, paniersReducer } from '../lib/paniers.js'
+import { prixLigne } from '../lib/conditionnements.js'
 
 const CartContext = createContext(null)
 const DELAI_BROUILLON = 200 // ms
@@ -35,12 +37,15 @@ export function CartProvider({ children }) {
       const brut = lireBrouillon()
       if (!brut) return
       const etat = revaliderBrouillon(brut, produits.data.results ?? [])
+      const retires = Math.max(0, compterLignes(brut) - compterLignes(etat))
       dispatch({ type: 'hydrate', state: etat })
       if (aDesLignes(etat)) {
         notify({
           type: 'panier-restaure',
           niveau: 'info',
-          texte: 'Panier restauré',
+          texte: retires > 0
+            ? `Panier restauré — ${retires} article${retires > 1 ? 's' : ''} retiré${retires > 1 ? 's' : ''} (produit ou mode indisponible)`
+            : 'Panier restauré',
           ephemere: true,
           masquable: true,
           audience: 'caissier',
@@ -67,17 +72,25 @@ export function CartProvider({ children }) {
 
   const value = useMemo(() => {
     const courant = state.paniers[state.actif] ?? state.paniers[0]
-    const items = courant.items
+    // chaque ligne porte sa clé (produit + mode) : inc/dec/remove/changerMode l'utilisent
+    const items = courant.items.map((i) => ({ ...i, cle: cleDeLigne(i) }))
     const count = items.reduce((s, i) => s + i.quantite, 0)
-    const total = items.reduce((s, i) => s + i.produit.prix_unitaire * i.quantite, 0)
+    const total = items.reduce(
+      (s, i) => s + prixLigne(i.produit, i.conditionnement) * i.quantite,
+      0,
+    )
     return {
       items,
       count,
       total,
-      add: (produit) => dispatch({ type: 'add', produit }),
-      inc: (id) => dispatch({ type: 'inc', id }),
-      dec: (id) => dispatch({ type: 'dec', id }),
-      remove: (id) => dispatch({ type: 'remove', id }),
+      add: (produit, mode = null) => dispatch({ type: 'add', produit, mode }),
+      inc: (cle) => dispatch({ type: 'inc', cle }),
+      dec: (cle) => dispatch({ type: 'dec', cle }),
+      remove: (cle) => dispatch({ type: 'remove', cle }),
+      // Changer le mode d'une ligne (Détail ↔ Carton…) : re-borné en unités de base.
+      changerMode: (cle, mode) => dispatch({ type: 'mode', cle, mode }),
+      // produits_mis_a_jour d'une vente : stock réel dans TOUS les paniers.
+      appliquerStocks: (majs) => dispatch({ type: 'stocks', majs }),
       // La vente validée ne vide QUE son panier (id = panier vendu).
       clear: (id) => dispatch({ type: 'clear', id }),
       vendu: (id) => dispatch({ type: 'vendu', id }),

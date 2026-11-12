@@ -2,6 +2,7 @@
  * Partage WhatsApp — lien `wa.me` construit à partir d'une vente.
  * Fonctions pures testées (normalisation, troncature, encodage).
  */
+import { libelleLigneMode } from './conditionnements.js'
 import { dateHeureDakar } from './dates.js'
 import { formatFcfa } from './money.js'
 
@@ -49,7 +50,8 @@ export function numeroClient(vente) {
  * proprement sous `limite` caractères.
  * @param {{id: number, date_vente: string, montant_total: number|string,
  *          lignes?: Array<{produit_nom: string, quantite: number,
- *                          montant_ligne: number|string}>}} vente
+ *                          montant_ligne: number|string, libelle?: string,
+ *                          facteur?: number, est_detail?: boolean}>}} vente
  * @param {{nom?: string, telephone?: string}} [boutique]
  * @param {{limite?: number}} [opts]
  * @returns {string}
@@ -68,9 +70,10 @@ export function construireTexte(vente, boutique = {}, opts = {}) {
     boutique.telephone ? `\nTél. ${boutique.telephone}` : ''
   }`
 
-  const corps = lignes.map(
-    (l) => `• ${l.produit_nom} ×${l.quantite} — ${formatFcfa(l.montant_ligne)}`,
-  )
+  const corps = lignes.map((l) => {
+    const mode = libelleLigneMode(l) // « Carton (12) », vide au Détail
+    return `• ${l.produit_nom} ×${l.quantite}${mode ? ` ${mode}` : ''} — ${formatFcfa(l.montant_ligne)}`
+  })
 
   // Ajoute les lignes une par une tant que la limite est respectée.
   const visibles = []

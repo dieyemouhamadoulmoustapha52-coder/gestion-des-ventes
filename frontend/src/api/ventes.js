@@ -1,14 +1,11 @@
-/** Endpoint vente — ventes/ (liste légère, création, détail avec lignes). */
+/** Endpoint vente — ventes/ (liste légère, création, détail avec lignes).
+ *  Toute traduction du contrat vit dans src/api/adaptateur.js. */
 import { request } from './client.js'
-import { toNumber } from '../lib/money.js'
+import { versVueLigne, versVueVente } from './adaptateur.js'
 
-const normVente = (v) => ({ ...v, montant_total: toNumber(v.montant_total) })
-const normLigne = (l) => ({
-  ...l,
-  prix_unitaire: toNumber(l.prix_unitaire),
-  montant_ligne: toNumber(l.montant_ligne),
-})
-const normComplete = (v) => ({ ...normVente(v), lignes: (v.lignes || []).map(normLigne) })
+const normVente = (v) => versVueVente(v)
+const normLigne = (l) => versVueLigne(l)
+const normComplete = (v) => versVueVente(v, (v.lignes ?? []).map(normLigne))
 
 /**
  * Liste paginée des ventes (sans lignes).
@@ -105,13 +102,16 @@ export async function listVentesDetaillees(params = {}) {
 /**
  * Création d'une vente — le serveur fige les prix et décrémente les stocks.
  * @param {{mode_paiement: import('./types.js').ModePaiement,
- *          lignes: Array<{produit: number, quantite: number}>,
+ *          lignes: Array<{produit: number, conditionnement?: number|null,
+ *                         quantite: number}>,
  *          client_nom?: string}} data
+ *   `conditionnement` null/absent = mode Détail
  * @returns {Promise<import('./types.js').VenteComplete>} 201
+ *   (`total` + `moyen_paiement` du contrat, normalisés en alias d'affichage)
  * @throws {import('./client.js').ApiError} code 'stock_insuffisant' (409)
  */
-export function creerVente(data) {
-  return request('ventes/', { method: 'POST', body: data })
+export async function creerVente(data) {
+  return normComplete(await request('ventes/', { method: 'POST', body: data }))
 }
 
 /** @param {number} id @returns {Promise<import('./types.js').VenteComplete>} */

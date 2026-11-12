@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getTableauDeBord } from '../api/rapports.js'
 import { reapprovisionnerProduit } from '../api/produits.js'
-import { formatFcfa, toNumber } from './money.js'
+import { formatFcfa, formatNombre, toNumber } from './money.js'
 
 describe('money helpers', () => {
   it('converts decimal strings to numbers', () => {
@@ -67,5 +67,14 @@ describe('frontend API contract endpoints', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1)
     expect(String(mockFetch.mock.calls[0][0])).toContain('/api/produits/1/reapprovisionner/')
     expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({ quantite: 12 })
+  })
+})
+
+describe('formatNombre', () => {
+  it('nombre localisé sans unité (options de mode)', () => {
+    expect(formatNombre(15000)).toBe(new Intl.NumberFormat('fr-FR').format(15000))
+    expect(formatNombre('15000.00')).toBe(new Intl.NumberFormat('fr-FR').format(15000))
+    expect(formatNombre(null)).toBe('0')
+    expect(formatNombre(0)).toBe('0')
   })
 })

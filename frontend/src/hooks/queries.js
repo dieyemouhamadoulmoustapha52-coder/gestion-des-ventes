@@ -186,11 +186,12 @@ export function useDeleteProduit() {
   })
 }
 
-/** @param {{id: number, quantite: number}} vars */
+/** @param {{id: number, quantite: number, conditionnement?: number|null}} vars */
 export function useReapprovisionnerProduit() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, quantite }) => reapprovisionnerProduit(id, quantite),
+    mutationFn: ({ id, quantite, conditionnement = null }) =>
+      reapprovisionnerProduit(id, quantite, conditionnement),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['produits'] })
       qc.invalidateQueries({ queryKey: ['rapport'] })

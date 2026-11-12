@@ -199,7 +199,7 @@ export default function Rapport() {
               aria-labelledby="t-top"
             >
               <h2 id="t-top" className="mb-3 text-sm font-semibold text-slate-900">
-                Top 3 des produits vendus
+                Top 3 des produits vendus (unités de base)
               </h2>
               {data.top_produits.length === 0 ? (
                 <p className="py-6 text-center text-sm text-slate-500">Aucune vente ce jour-là.</p>
@@ -226,7 +226,7 @@ export default function Rapport() {
                         <p className="truncate text-sm font-medium text-slate-900">{t.nom}</p>
                         <p className="font-mono text-xs text-slate-400">{t.code}</p>
                       </div>
-                      <Badge tone="blue">× {t.qte}</Badge>
+                      <Badge tone="blue">{t.qte} unité{t.qte > 1 ? 's' : ''}</Badge>
                     </li>
                   ))}
                 </ol>
@@ -258,7 +258,8 @@ export default function Rapport() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-slate-900">{p.nom}</p>
                         <p className="text-xs text-slate-500">
-                          Stock {p.stock} · seuil {p.seuil_alerte}
+                          Stock : {p.stock} unité{p.stock > 1 ? 's' : ''} de base ·
+                          seuil {p.seuil_alerte}
                         </p>
                       </div>
                       <Badge tone={p.en_rupture ? 'red' : 'orange'}>
