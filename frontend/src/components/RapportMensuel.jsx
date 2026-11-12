@@ -134,7 +134,7 @@ export default function RapportMensuel() {
         le mois dernier : <strong>{formatFcfa(precedentMemeJours.ca)}</strong>
       </p>
 
-      <h3 className="mb-2 mt-5 text-sm font-semibold text-slate-900">Top 5 produits du mois</h3>
+      <h3 className="mb-2 mt-5 text-sm font-semibold text-slate-900">Top 5 produits du mois (unités de base)</h3>
       {top.length === 0 ? (
         <div className="py-4">
           <EmptyState
@@ -167,7 +167,9 @@ export default function RapportMensuel() {
                 <p className="font-mono text-xs text-slate-400">{t.code}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-semibold text-slate-900">× {t.qte}</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {t.qte} unité{t.qte > 1 ? 's' : ''}
+                </p>
                 <p className="text-xs text-slate-500">{formatFcfa(t.ca)}</p>
               </div>
               <div className="w-28 text-right">

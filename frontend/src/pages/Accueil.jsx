@@ -302,7 +302,9 @@ export default function Accueil() {
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold text-slate-900">Top 5 semaine</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+            Top 5 semaine (unités de base)
+          </h2>
             <Link to="/produits" className="inline-flex items-center gap-1 text-sm font-medium text-[var(--primary-ink)]">
               Voir catalogue <ArrowRight size={14} />
             </Link>
@@ -320,7 +322,7 @@ export default function Accueil() {
                     <p className="truncate text-sm font-medium text-slate-900">{p.nom}</p>
                     <p className="font-mono text-[11px] text-slate-500">{p.code}</p>
                   </div>
-                  <Badge tone="blue">× {p.qte}</Badge>
+                  <Badge tone="blue">{p.qte} unité{p.qte > 1 ? 's' : ''}</Badge>
                 </li>
               ))
             )}

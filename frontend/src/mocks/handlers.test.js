@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { handlers } from './handlers.js'
 import * as db from './db.js'
+import { dateDakar } from '../lib/dates.js'
 
 const SEED = structuredClone(db.state)
 
@@ -536,5 +537,49 @@ describe('POST ventes', () => {
     const v = body.results[0]
     expect(v.montant_total).toBeDefined()
     expect(v.mode_paiement).toBeDefined()
+  })
+})
+
+describe('rapports — agrégation en unités de base', () => {
+  const RAPPORT_JOUR = '*/api/rapports/jour/'
+  const TABLEAU = '*/api/rapports/tableau-de-bord/'
+
+  it('2 cartons vendus comptent pour 24 unités, CA par catégorie = total_ligne', async () => {
+    const jour = dateDakar()
+    const catNom = db.findCategorie(db.findProduit(10).categorie).nom
+    const nb = (r) => r.top_produits.find((t) => t.produit === 10)?.qte ?? 0
+    const ca = (r) => Number(r.ca_par_categorie.find((c) => c.categorie === catNom)?.ca ?? 0)
+
+    const avant = await appel('GET', RAPPORT_JOUR, { query: `date=${jour}` })
+    const { status } = await appel('POST', VENTES, {
+      body: { mode_paiement: 'ESPECES', lignes: [{ produit: 10, conditionnement: 3, quantite: 2 }] },
+    })
+    expect(status).toBe(201)
+    const apres = await appel('GET', RAPPORT_JOUR, { query: `date=${jour}` })
+
+    // 2 cartons ×12 = 24 unités de base (et non « 2 »)
+    expect(nb(apres.body) - nb(avant.body)).toBe(24)
+    // le CA par catégorie suit le total des lignes (30 000)
+    expect(ca(apres.body) - ca(avant.body)).toBe(30000)
+  })
+
+  it('valeur_stock = prix de vente × stock en unités de base', async () => {
+    const valeur = (r) => Number(r.stock.valeur_stock)
+    const avant = await appel('GET', TABLEAU, {})
+    await appel('POST', VENTES, {
+      body: { mode_paiement: 'ESPECES', lignes: [{ produit: 10, conditionnement: 3, quantite: 2 }] },
+    })
+    const apres = await appel('GET', TABLEAU, {})
+    // −24 unités × 1 500 (prix de vente détail)
+    expect(valeur(apres.body) - valeur(avant.body)).toBe(-24 * 1500)
+  })
+
+  it('produits_a_racheter exprime le stock en unités de base', async () => {
+    const r = await appel('GET', RAPPORT_JOUR, { query: `date=${dateDakar()}` })
+    // JAVEL (id 12) est à 0 ≤ seuil 3 : présent dans les alertes
+    const alerte = r.body.produits_a_racheter.find((a) => a.produit === 12)
+    expect(alerte).toBeDefined()
+    expect(alerte.stock).toBe(db.findProduit(12).quantite)
+    expect(alerte.en_rupture).toBe(true)
   })
 })

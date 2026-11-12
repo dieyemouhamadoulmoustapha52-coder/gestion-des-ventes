@@ -130,12 +130,14 @@ export function comparerMois(ventes, ref = dateDakar()) {
 }
 
 /**
- * Top N produits du mois en cours (quantité vendue, CA), avec variation de
- * quantité vs le mois précédent à nombre de jours égal.
+ * Top N produits du mois en cours (quantité vendue en UNITÉS DE BASE, CA),
+ * avec variation de quantité vs le mois précédent à nombre de jours égal.
+ * Une ligne « 2 cartons ×12 » compte pour 24 (et non 2).
  *
  * @param {Array<{date_vente: string, montant_total: number|string,
  *                lignes?: Array<{produit: number, produit_nom?: string,
  *                                produit_code?: string, quantite: number,
+ *                                facteur?: number, quantite_base?: number,
  *                                prix_unitaire: number, montant_ligne: number|string}>}>} ventes
  * @param {string} [ref] 'YYYY-MM-DD'
  * @param {number} [n] taille du top (5 par défaut)
@@ -158,7 +160,10 @@ export function topProduits(ventes, ref = dateDakar(), n = 5) {
           qte: 0,
           ca: 0,
         }
-        e.qte += Number(l.quantite) || 0
+        // quantité en unités de base (facteur × modes), sinon mode lui-même
+        e.qte += Number.isInteger(l.quantite_base)
+          ? l.quantite_base
+          : (Number(l.quantite) || 0) * Math.max(1, Math.trunc(toNumber(l.facteur) || 1))
         e.ca += toNumber(l.montant_ligne) || toNumber(l.prix_unitaire) * (Number(l.quantite) || 0)
         if (l.produit_nom) e.nom = l.produit_nom
         if (l.produit_code) e.code = l.produit_code

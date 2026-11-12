@@ -138,6 +138,41 @@ describe('topProduits', () => {
     expect(top.map((t) => t.produit)).toEqual([1, 2])
   })
 
+  it('compte les lignes en unités de base (facteur × modes)', () => {
+    const avecModes = [
+      {
+        date_vente: '2027-01-10T10:00:00+00:00',
+        montant_total: 30000,
+        lignes: [
+          {
+            id: 1,
+            produit: 7,
+            produit_nom: 'COLA',
+            quantite: 2,
+            facteur: 12,
+            quantite_base: 24,
+            prix_unitaire: 15000,
+            montant_ligne: 30000,
+          },
+        ],
+      },
+    ]
+    expect(topProduits(avecModes, '2027-01-15', 5)[0]).toMatchObject({ qte: 24, ca: 30000 })
+  })
+
+  it('reconstruit les unités de base quand `quantite_base` manque', () => {
+    const sansBase = [
+      {
+        date_vente: '2027-01-10T10:00:00+00:00',
+        montant_total: 8000,
+        lignes: [
+          { id: 1, produit: 7, quantite: 2, facteur: 6, prix_unitaire: 4000, montant_ligne: 8000 },
+        ],
+      },
+    ]
+    expect(topProduits(sansBase, '2027-01-15', 5)[0].qte).toBe(12)
+  })
+
   it('sans ventes → tableau vide', () => {
     expect(topProduits([], '2027-01-15')).toEqual([])
   })

@@ -60,7 +60,11 @@ export function topVendus(ventes, n = 8) {
     for (const l of v.lignes ?? []) {
       const id = l?.produit
       if (id === null || id === undefined) continue
-      qtes.set(id, (qtes.get(id) ?? 0) + (Number(l.quantite) || 0))
+      // classement en unités de base : 2 cartons ×12 valent 24
+      const base = Number.isInteger(l.quantite_base)
+        ? l.quantite_base
+        : (Number(l.quantite) || 0) * Math.max(1, Math.trunc(Number(l.facteur) || 1))
+      qtes.set(id, (qtes.get(id) ?? 0) + base)
     }
   }
   return [...qtes.entries()]

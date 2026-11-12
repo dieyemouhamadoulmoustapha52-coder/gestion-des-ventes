@@ -128,6 +128,17 @@ function messagesConditionnements(liste, produitId = null) {
   return messages
 }
 
+/**
+ * Unités de base d'une ligne brute du store (snapshot éventuellement sans
+ * `quantite_base`) : `quantite × facteur` — les rapports agrègent toujours
+ * en unités de base.
+ */
+const baseDe = (l) => {
+  if (Number.isInteger(l?.quantite_base)) return l.quantite_base
+  const facteur = Number.isInteger(l?.facteur) ? l.facteur : 1
+  return (Number(l?.quantite) || 0) * facteur
+}
+
 export const handlers = [
   // ── categories/ ─────────────────────────────────────────────
   http.get('*/api/categories/', ({ request }) => {
@@ -630,22 +641,22 @@ export const handlers = [
       parMode.set(v.mode_paiement, e)
     }
 
-    // CA par catégorie (du jour, trié -ca)
+    // CA par catégorie (du jour, trié -ca) — total des lignes (prix × mode)
     const parCat = new Map()
     for (const l of lignesJour) {
       const p = db.findProduit(l.produit)
       const cat = db.findCategorie(p?.categorie)
       if (!cat) continue
-      parCat.set(cat.nom, (parCat.get(cat.nom) || 0) + l.quantite * l.prix)
+      parCat.set(cat.nom, (parCat.get(cat.nom) || 0) + Number(l.total_ligne ?? l.quantite * l.prix))
     }
 
-    // top 3 des quantités vendues (du jour)
+    // top 3 des quantités vendues (du jour) — EN UNITÉS DE BASE
     const parProd = new Map()
     for (const l of lignesJour) {
       const p = db.findProduit(l.produit)
       if (!p) continue
       const e = parProd.get(p.id) || { produit: p.id, code: p.code, nom: p.nom, qte: 0 }
-      e.qte += l.quantite
+      e.qte += baseDe(l)
       parProd.set(p.id, e)
     }
 
@@ -704,7 +715,7 @@ export const handlers = [
       const p = db.findProduit(l.produit)
       if (!p) continue
       const e = parProd.get(p.id) || { produit: p.id, code: p.code, nom: p.nom, qte: 0 }
-      e.qte += l.quantite
+      e.qte += baseDe(l) // EN UNITÉS DE BASE
       parProd.set(p.id, e)
     }
     const top = [...parProd.values()].sort((a, b) => b.qte - a.qte).slice(0, 5)
@@ -715,6 +726,7 @@ export const handlers = [
       nb_produits: produits.length,
       nb_en_alerte: produits.filter((p) => p.quantite <= p.seuil_alerte).length,
       nb_en_rupture: produits.filter((p) => p.quantite === 0).length,
+      // Valeur au prix de VENTE détail × stock en unités de base.
       valeur_stock: db.money(produits.reduce((s, p) => s + p.prix * p.quantite, 0)),
     }
 

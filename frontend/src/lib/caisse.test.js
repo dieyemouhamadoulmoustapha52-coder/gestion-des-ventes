@@ -88,6 +88,17 @@ describe('topVendus', () => {
     expect(topVendus(nombreux, 8)[0]).toEqual({ produit: 1, quantite: 20 })
   })
 
+  it('classe en unités de base (2 cartons ×12 = 24)', () => {
+    const ventesModes = [
+      { lignes: [{ produit: 1, quantite: 2, facteur: 12, quantite_base: 24 }] },
+      { lignes: [{ produit: 2, quantite: 3, facteur: 1 }] },
+    ]
+    expect(topVendus(ventesModes, 8)).toEqual([
+      { produit: 1, quantite: 24 },
+      { produit: 2, quantite: 3 },
+    ])
+  })
+
   it('sans ventes → tableau vide', () => {
     expect(topVendus([], 8)).toEqual([])
     expect(topVendus(null, 8)).toEqual([])
