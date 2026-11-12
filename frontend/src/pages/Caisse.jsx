@@ -23,12 +23,13 @@ import { useMessages } from '../context/MessagesContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille, useVentes30Jours } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
 import { calculerMonnaie, filtrerProduits, topVendus } from '../lib/caisse.js'
-import { formatFcfa, formatNombre, toNumber } from '../lib/money.js'
+import { formatFcfa, toNumber } from '../lib/money.js'
 import {
   formaterStock,
   maxQuantiteLigne,
   modeDetail,
   modesActifs,
+  optionModeLabel,
   prixLigne,
 } from '../lib/conditionnements.js'
 import { ligneCle } from '../lib/paniers.js'
@@ -138,10 +139,6 @@ export default function Caisse() {
   }
   const modeParCle = (produit, cle) =>
     (produit.conditionnements ?? []).find((m) => ligneCle(produit.id, m) === cle) ?? null
-  const libelleOption = (m) =>
-    m?.est_detail || Number(m?.facteur) === 1
-      ? `Détail · ${formatNombre(m?.prix_vente ?? 0)}`
-      : `${m.libelle} ×${m.facteur} · ${formatNombre(m.prix_vente)}`
 
   const validate = () => {
     if (cart.items.length === 0 || creer.isPending || monnaieBloquante) return
@@ -545,7 +542,7 @@ export default function Caisse() {
                           >
                             {modesDeLigne(item.produit, item.cle).map((o) => (
                               <option key={o.cle} value={o.cle}>
-                                {libelleOption(o.mode)}
+                                {optionModeLabel(o.mode)}
                               </option>
                             ))}
                           </select>

@@ -5,6 +5,7 @@ import {
   disponibleEnMode,
   formaterStock,
   libelleLigneMode,
+  optionModeLabel,
   margeMode,
   maxQuantiteLigne,
   normaliserProduit,
@@ -245,4 +246,14 @@ describe('affichage des lignes', () => {
     expect(libelleLigneMode({ quantite: 3, prix_unitaire: 750 })).toBe('')
     expect(libelleLigneMode(null)).toBe('')
   })
+  it('optionModeLabel : « Détail · prix », « Carton ×12 · prix »', () => {
+    expect(optionModeLabel({ id: 1, libelle: 'Détail', facteur: 1, est_detail: true, prix_vente: 1500 })).toBe(
+      `Détail · ${new Intl.NumberFormat('fr-FR').format(1500)}`,
+    )
+    expect(optionModeLabel({ id: 3, libelle: 'Carton', facteur: 12, est_detail: false, prix_vente: 15000 })).toBe(
+      `Carton ×12 · ${new Intl.NumberFormat('fr-FR').format(15000)}`,
+    )
+    expect(optionModeLabel(null, 750)).toBe(`Détail · ${new Intl.NumberFormat('fr-FR').format(750)}`)
+  })
+
 })

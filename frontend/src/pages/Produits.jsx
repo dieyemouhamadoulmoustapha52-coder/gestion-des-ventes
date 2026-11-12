@@ -1,9 +1,10 @@
 /**
  * Écran Produits & catégories :
  * tableau paginé, recherche (debounce 250 ms), filtre catégorie,
- * badges stock bas / rupture, CRUD en modal, suppression confirmée.
+ * badges stock bas / rupture, formulaire produit EN LIGNE,
+ * réapprovisionnement EN LIGNE par mode de vente, suppression confirmée.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Package, PackagePlus, Pencil, Plus, Search, Tags, Trash2 } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
@@ -12,14 +13,13 @@ import CategorieManager from '../components/CategorieManager.jsx'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
-import Modal from '../components/Modal.jsx'
 import Pagination from '../components/Pagination.jsx'
 import ProduitForm from '../components/ProduitForm.jsx'
 import Skeleton from '../components/Skeleton.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { useCategories, useDeleteProduit, useProduits, useReapprovisionnerProduit } from '../hooks/queries.js'
 import { formatFcfa } from '../lib/money.js'
-import { formaterStock, modesActifs } from '../lib/conditionnements.js'
+import { formaterStock, modesActifs, optionModeLabel } from '../lib/conditionnements.js'
 import { useDebouncedValue } from '../lib/useDebounce.js'
 
 const PAGE_SIZE = 10 // convention de pagination DRF (docs/API_CONTRACT.md)
@@ -43,8 +43,9 @@ export default function Produits() {
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState(null) // 'create' | Produit | null
   const [toDelete, setToDelete] = useState(null)
-  const [reappro, setReappro] = useState(null)
+  const [reappro, setReappro] = useState(null) // produit ouvert en réappro
   const [reapproQte, setReapproQte] = useState('')
+  const [reapproModeId, setReapproModeId] = useState('') // '' = Détail
   const [managerOpen, setManagerOpen] = useState(false)
 
   const debouncedSearch = useDebouncedValue(search, 250)
@@ -112,19 +113,55 @@ export default function Produits() {
     })
   }
 
+  const ouvrirReappro = (p) => {
+    if (reappro?.id === p.id) {
+      fermerReappro()
+      return
+    }
+    setReappro(p)
+    setReapproQte('')
+    setReapproModeId('')
+  }
+  const fermerReappro = () => {
+    setReappro(null)
+    setReapproQte('')
+    setReapproModeId('')
+  }
+
+  // Mode choisi dans la ligne de réappro (null = Détail).
+  const modeReappro = reappro
+    ? (modesActifs(reappro).find((m) => String(m.id ?? '') === reapproModeId) ?? null)
+    : null
+  const facteurReappro = Math.max(1, Math.trunc(Number(modeReappro?.facteur) || 1))
+  const qteReappro = Number(reapproQte)
+  const entierReappro = Number.isInteger(qteReappro) && qteReappro > 0
+  const baseReappro = entierReappro ? qteReappro * facteurReappro : null
+  const stockApres =
+    baseReappro !== null && reappro
+      ? Math.max(0, Math.trunc(Number(reappro.quantite ?? 0))) + baseReappro
+      : null
+
   const submitReappro = () => {
-    const q = Number(reapproQte)
-    if (!Number.isInteger(q) || q <= 0) {
+    if (!reappro) return
+    if (!entierReappro) {
       toast.error('La quantité doit être un entier strictement positif.')
       return
     }
+    // Contrat : `conditionnement` null = Détail (jamais l'id d'un Détail).
+    const conditionnement =
+      modeReappro && modeReappro.est_detail !== true && facteurReappro > 1
+        ? modeReappro.id
+        : null
     reapproMutation.mutate(
-      { id: reappro.id, quantite: q },
+      { id: reappro.id, quantite: qteReappro, conditionnement },
       {
         onSuccess: () => {
-          toast.success(`Stock de « ${reappro.nom} » mis à jour.`)
-          setReappro(null)
-          setReapproQte('')
+          toast.success(
+            `Stock de « ${reappro.nom} » mis à jour (+ ${baseReappro} unité${
+              baseReappro > 1 ? 's' : ''
+            } de base).`,
+          )
+          fermerReappro()
         },
         onError: (err) => {
           toast.error(err.detail || 'Réapprovisionnement impossible.')
@@ -266,7 +303,8 @@ export default function Produits() {
                   {produits.data.results.map((p) => {
                     const modesVente = modesActifs(p).filter((m) => m.facteur > 1)
                     return (
-                    <tr key={p.id} className="transition-colors duration-200 ease-in-out">
+                    <Fragment key={p.id}>
+                    <tr className="transition-colors duration-200 ease-in-out">
                       <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.code}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{p.nom}</td>
                       <td className="px-4 py-3 text-slate-600">{p.categorie_nom}</td>
@@ -314,7 +352,7 @@ export default function Produits() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"
-                            onClick={() => setReappro(p)}
+                            onClick={() => ouvrirReappro(p)}
                             aria-label={`Réapprovisionner ${p.nom}`}
                             className="flex h-11 w-11 items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50"
                           >
@@ -339,6 +377,96 @@ export default function Produits() {
                         </div>
                       </td>
                     </tr>
+                    {reappro?.id === p.id ? (
+                    <tr className="bg-emerald-50/50">
+                      <td colSpan={8} className="px-4 py-3">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault()
+                            submitReappro()
+                          }}
+                          className="flex flex-wrap items-end gap-3"
+                        >
+                          <div>
+                            <label
+                              htmlFor={`reap-mode-${p.id}`}
+                              className="block text-xs font-medium text-slate-500"
+                            >
+                              Mode de vente
+                            </label>
+                            <select
+                              id={`reap-mode-${p.id}`}
+                              value={reapproModeId}
+                              onChange={(e) => setReapproModeId(e.target.value)}
+                              className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                            >
+                              {modesActifs(p).map((m) => (
+                                <option key={m.id ?? 'detail'} value={String(m.id ?? '')}>
+                                  {optionModeLabel(m, p.prix)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label
+                              htmlFor={`reap-qte-${p.id}`}
+                              className="block text-xs font-medium text-slate-500"
+                            >
+                              Quantité à ajouter
+                            </label>
+                            <input
+                              id={`reap-qte-${p.id}`}
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={reapproQte}
+                              onChange={(e) => setReapproQte(e.target.value)}
+                              className="h-11 w-28 rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                              placeholder={facteurReappro > 1 ? '2' : '12'}
+                              autoFocus
+                            />
+                          </div>
+                          <p className="pb-3 text-xs text-slate-600">
+                            {baseReappro !== null ? (
+                              <>
+                                <strong>
+                                  + {baseReappro} unité{baseReappro > 1 ? 's' : ''}
+                                </strong>{' '}
+                                de base — stock après :{' '}
+                                <strong>
+                                  {formaterStock(stockApres, p.conditionnements)}
+                                </strong>
+                                {' · '}
+                                {p.quantite} aujourd’hui
+                              </>
+                            ) : (
+                              <>
+                                Stock actuel : <strong>{p.quantite}</strong> unité
+                                {p.quantite > 1 ? 's' : ''} de base
+                                {facteurReappro > 1
+                                  ? ` · 1 ${modeReappro?.libelle ?? ''} = ${facteurReappro} unités`
+                                  : ''}
+                              </>
+                            )}
+                          </p>
+                          <div className="ml-auto flex gap-2 pb-1">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={fermerReappro}
+                              disabled={reapproMutation.isPending}
+                            >
+                              Annuler
+                            </Button>
+                            <Button type="submit" disabled={reapproMutation.isPending}>
+                              {reapproMutation.isPending ? 'Ajout…' : 'Ajouter au stock'}
+                            </Button>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                    ) : null}
+                    </Fragment>
                     )
                   })}
                 </tbody>
@@ -356,55 +484,6 @@ export default function Produits() {
         </>
       )}
 
-      {/* Modales */}
-      <Modal
-        open={Boolean(reappro)}
-        title={`Réapprovisionner — ${reappro?.nom ?? ''}`}
-        onClose={() => {
-          setReappro(null)
-          setReapproQte('')
-        }}
-        size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => {
-              setReappro(null)
-              setReapproQte('')
-            }} disabled={reapproMutation.isPending}>
-              Annuler
-            </Button>
-            <Button onClick={submitReappro} disabled={reapproMutation.isPending}>
-              {reapproMutation.isPending ? 'Ajout…' : 'Ajouter au stock'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-3">
-          <label htmlFor="reap-qty" className="block text-sm font-medium text-slate-700">
-            Quantité à ajouter
-          </label>
-          <input
-            id="reap-qty"
-            type="number"
-            min="1"
-            step="1"
-            value={reapproQte}
-            onChange={(e) => setReapproQte(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                submitReappro()
-              }
-            }}
-            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
-            placeholder="12"
-            autoFocus
-          />
-          <p className="text-xs text-slate-500">
-            Stock actuel : <strong>{reappro?.stock ?? 0}</strong>
-          </p>
-        </div>
-      </Modal>
       <CategorieManager open={managerOpen} onClose={() => setManagerOpen(false)} />
       <ConfirmDialog
         open={Boolean(toDelete)}

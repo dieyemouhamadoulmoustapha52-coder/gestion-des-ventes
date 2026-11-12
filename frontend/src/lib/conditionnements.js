@@ -10,7 +10,7 @@
  * `normaliserProduit()` sert à la frontière API (src/api/adaptateur.js) et sur
  * toute donnée persistée (brouillon localStorage).
  */
-import { toNumber } from './money.js'
+import { formatNombre, toNumber } from './money.js'
 
 /** Suggestions d'unité de base (formulaire produit). */
 export const SUGGESTIONS_UNITE = ['unité', 'bouteille', 'pièce', 'sachet', 'paquet', 'boîte']
@@ -405,6 +405,22 @@ export function libelleConditionnement(mode) {
   const libelle = String(mode.libelle ?? '').trim()
   const facteur = Math.trunc(toNumber(mode.facteur))
   return facteur > 1 ? `${libelle} (${facteur})` : libelle
+}
+
+/**
+ * Étiquette d'un mode dans une liste déroulante (caisse, réappro) :
+ * « Détail · 1 500 », « Carton ×12 · 15 000 » — montants en FCFA sans unité.
+ * @param {Partial<Conditionnement>|null|undefined} mode
+ * @param {number} [fallbackPrix] prix si `prix_vente` absent (Détail dérivé)
+ * @returns {string}
+ */
+export function optionModeLabel(mode, fallbackPrix = 0) {
+  const facteur = Math.max(1, Math.trunc(toNumber(mode?.facteur) || 1))
+  const estDetail = !mode || mode.est_detail === true || facteur === 1
+  const libelle = estDetail
+    ? 'Détail'
+    : `${String(mode.libelle ?? '').trim() || `×${facteur}`} ×${facteur}`
+  return `${libelle} · ${formatNombre(toNumber(mode?.prix_vente ?? fallbackPrix))}`
 }
 
 /**
