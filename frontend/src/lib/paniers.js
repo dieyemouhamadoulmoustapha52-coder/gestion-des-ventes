@@ -1,18 +1,61 @@
 /**
  * Paniers multiples de caisse — @audience caissier.
  * Reducer PUR (testé par Vitest) : jusqu'à `PANIER_MAX` paniers, un seul actif.
+ * Ligne = produit + MODE DE VENTE (null = Détail) + quantité en modes ;
+ * les bornes de quantité sont calculées en unités de base via
+ * `maxQuantiteLigne` (cumul des autres lignes du même produit déduit).
  * L'état vit dans CartContext ; la persistance est gérée à part (gv:paniers:v1).
  */
+import { maxQuantiteLigne } from './conditionnements.js'
 
 /** Nombre maximal de paniers ouverts simultanément. */
 export const PANIER_MAX = 5
 
 /**
  * @typedef {{produit: {id: number, stock: number, prix_unitaire: number, nom: string},
- *            quantite: number}} LignePanier
+ *            conditionnement: object|null, quantite: number}} LignePanier
  * @typedef {{id: number, items: LignePanier[]}} Panier
  * @typedef {{paniers: Panier[], actif: number, seq: number}} PaniersState
  */
+
+/**
+ * Clé d'une ligne : produit + mode. Le Détail (mode absent, `est_detail` ou
+ * facteur 1) a TOUJOURS la même clé `« id:detail »` — la restauration d'un
+ * ancien brouillon (sans mode) ne crée donc jamais de doublon.
+ * @param {number} produitId
+ * @param {{id?: number|null, facteur?: number, est_detail?: boolean}|null} [mode]
+ * @returns {string}
+ */
+export function ligneCle(produitId, mode) {
+  const estDetail = !mode || mode.est_detail === true || Number(mode.facteur) === 1
+  return `${produitId}:${estDetail ? 'detail' : mode.id}`
+}
+
+/** @param {LignePanier} ligne @returns {string} */
+export function cleDeLigne(ligne) {
+  return ligneCle(ligne?.produit?.id, ligne?.conditionnement ?? null)
+}
+
+/** Stock en unités de base d'un produit (alias legacy `stock` accepté). */
+function stockDe(produit) {
+  return Math.max(0, Math.trunc(Number(produit?.stock ?? produit?.quantite ?? 0)))
+}
+
+/** Facteur d'une ligne (mode absent = Détail = 1). */
+function facteurDe(ligne) {
+  return Math.max(1, Math.trunc(Number(ligne?.conditionnement?.facteur ?? 1)))
+}
+
+/** Unités de base prises par les AUTRES lignes d'un produit (hors `saufCle`). */
+function besoinHorsLigne(items, produitId, saufCle) {
+  return (items ?? []).reduce(
+    (s, i) =>
+      i?.produit?.id === produitId && cleDeLigne(i) !== saufCle
+        ? s + Math.max(1, Math.trunc(i.quantite)) * facteurDe(i)
+        : s,
+    0,
+  )
+}
 
 /** @returns {PaniersState} un panier unique, vide, actif */
 export function paniersEtatInitial() {
@@ -27,25 +70,40 @@ function mapActif(state, fn) {
   }
 }
 
-/** Ajoute/incrémente une ligne dans un panier (borné au stock du snapshot). */
-function ajouterLigne(items, produit) {
-  if (produit.stock <= 0) return items
-  const existing = items.find((i) => i.produit.id === produit.id)
-  if (existing) {
+/**
+ * Ajoute/incrémente une ligne (produit + mode), bornée au stock restant
+ * déduction faite des autres lignes du même produit.
+ * @returns {LignePanier[]} nouveau tableau (jamais muté)
+ */
+function ajouterLigne(items, produit, mode) {
+  const stock = stockDe(produit)
+  if (stock <= 0) return items
+  const facteur = Math.max(1, Math.trunc(Number(mode?.facteur ?? 1)))
+  const cle = ligneCle(produit.id, mode)
+  const existant = items.find((i) => cleDeLigne(i) === cle)
+  const hors = besoinHorsLigne(items, produit.id, cle)
+  const max = maxQuantiteLigne(facteur, stock, hors)
+  if (max < 1) return items
+  if (existant) {
+    const quantite = Math.min(existant.quantite + 1, max)
+    if (quantite === existant.quantite) return items // déjà au maximum
     return items.map((i) =>
-      i.produit.id === produit.id
-        ? { ...i, quantite: Math.min(i.quantite + 1, produit.stock), produit }
+      cleDeLigne(i) === cle
+        ? { ...i, quantite, produit, conditionnement: mode ?? i.conditionnement ?? null }
         : i,
     )
   }
-  return [...items, { produit, quantite: 1 }]
+  return [...items, { produit, conditionnement: mode ?? null, quantite: 1 }]
 }
 
 /**
  * Reducer pur des paniers de caisse.
  * @param {PaniersState} state
- * @param {{type: string, produit?: object, id?: number, state?: PaniersState}} action
- *   - add/inc/dec/remove/clear : opèrent sur le panier ACTIF
+ * @param {{type: string, produit?: object, mode?: object|null, cle?: string,
+ *          id?: number, state?: PaniersState}} action
+ *   - add {produit, mode?} : ajoute/incrémente la ligne produit+mode (Détail si mode omis)
+ *   - inc/dec/remove {cle} : opèrent sur une ligne (l'ancien `id` = ligne Détail)
+ *   - mode {cle, mode} : change le mode d'une ligne (fusion si la ligne cible existe)
  *   - activer {id} : bascule d'onglet (index)
  *   - ajouter : crée un panier (max PANIER_MAX) et le rend actif
  *   - fermer {id} : ferme UN panier VIDE uniquement
@@ -59,34 +117,44 @@ export function paniersReducer(state, action) {
       return action.state ?? state
 
     case 'add': {
-      const { produit } = action
+      const { produit, mode } = action
       if (!produit) return state
-      return mapActif(state, (p) => ({ ...p, items: ajouterLigne(p.items, produit) }))
+      return mapActif(state, (p) => ({ ...p, items: ajouterLigne(p.items, produit, mode ?? null) }))
     }
 
     case 'inc':
-      return mapActif(state, (p) => ({
-        ...p,
-        items: p.items.map((i) =>
-          i.produit.id === action.id
-            ? { ...i, quantite: Math.min(i.quantite + 1, i.produit.stock) }
-            : i,
-        ),
-      }))
+      return mapActif(state, (p) => {
+        const cle = action.cle ?? ligneCle(action.id, action.mode ?? null)
+        return {
+          ...p,
+          items: p.items.map((i) => {
+            if (cleDeLigne(i) !== cle) return i
+            const hors = besoinHorsLigne(p.items, i.produit.id, cle)
+            const max = maxQuantiteLigne(facteurDe(i), stockDe(i.produit), hors)
+            return { ...i, quantite: Math.min(i.quantite + 1, max) }
+          }),
+        }
+      })
 
     case 'dec':
-      return mapActif(state, (p) => ({
-        ...p,
-        items: p.items.map((i) =>
-          i.produit.id === action.id ? { ...i, quantite: Math.max(1, i.quantite - 1) } : i,
-        ),
-      }))
+      return mapActif(state, (p) => {
+        const cle = action.cle ?? ligneCle(action.id, action.mode ?? null)
+        return {
+          ...p,
+          items: p.items.map((i) =>
+            cleDeLigne(i) === cle ? { ...i, quantite: Math.max(1, i.quantite - 1) } : i,
+          ),
+        }
+      })
 
     case 'remove':
-      return mapActif(state, (p) => ({
-        ...p,
-        items: p.items.filter((i) => i.produit.id !== action.id),
-      }))
+      return mapActif(state, (p) => {
+        const cle = action.cle ?? ligneCle(action.id, action.mode ?? null)
+        return { ...p, items: p.items.filter((i) => cleDeLigne(i) !== cle) }
+      })
+
+    case 'mode':
+      return mapActif(state, (p) => changerMode(p, action))
 
     case 'clear':
       return typeof action.id === 'number'
@@ -128,4 +196,61 @@ export function paniersReducer(state, action) {
     default:
       return state
   }
+}
+
+/**
+ * Change le mode d'une ligne : la quantité est re-bornée en unités de base,
+ * et la ligne fusionne si le produit+mode existe déjà dans le panier.
+ * Mode absent du catalogue ou qui ne tient pas en stock → no-op.
+ */
+function changerMode(panier, action) {
+  const { cle, mode } = action
+  const idx = panier.items.findIndex((i) => cleDeLigne(i) === cle)
+  if (idx === -1) return panier
+  const ligne = panier.items[idx]
+  const nouvelleCle = ligneCle(ligne.produit.id, mode ?? null)
+  const facteur = Math.max(1, Math.trunc(Number(mode?.facteur ?? 1)))
+  const stock = stockDe(ligne.produit)
+  const hors = besoinHorsLigne(panier.items, ligne.produit.id, cle)
+  const max = maxQuantiteLigne(facteur, stock, hors)
+  if (max < 1) return panier // ce mode ne tient pas : la ligne reste en place
+  const quantite = Math.min(ligne.quantite, max)
+
+  if (nouvelleCle === cle) {
+    // même mode (Détail ↔ Détail) : on réordonne rien, on borne seulement
+    return {
+      ...panier,
+      items: panier.items.map((i, j) => (j === idx ? { ...i, conditionnement: mode ?? null, quantite } : i)),
+    }
+  }
+
+  const cible = panier.items.findIndex((i, j) => j !== idx && cleDeLigne(i) === nouvelleCle)
+  if (cible === -1) {
+    return {
+      ...panier,
+      items: panier.items.map((i, j) =>
+        j === idx ? { ...i, conditionnement: mode ?? null, quantite } : i,
+      ),
+    }
+  }
+
+  // Fusion : la ligne cible absorbe la quantité (re-bornée), on garde la position la plus ancienne.
+  const autre = panier.items[cible]
+  const horsAutre = panier.items.reduce(
+    (s, i, j) =>
+      j !== idx && j !== cible && i.produit.id === ligne.produit.id
+        ? s + Math.max(1, Math.trunc(i.quantite)) * facteurDe(i)
+        : s,
+    0,
+  )
+  const maxAutre = maxQuantiteLigne(facteur, stock, horsAutre)
+  const fusion = {
+    ...autre,
+    produit: ligne.produit,
+    conditionnement: mode ?? null,
+    quantite: Math.min(autre.quantite + quantite, maxAutre),
+  }
+  const position = Math.min(idx, cible)
+  const reste = panier.items.filter((_, j) => j !== idx && j !== cible)
+  return { ...panier, items: [...reste.slice(0, position), fusion, ...reste.slice(position)] }
 }

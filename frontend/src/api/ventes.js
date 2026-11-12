@@ -102,13 +102,16 @@ export async function listVentesDetaillees(params = {}) {
 /**
  * Création d'une vente — le serveur fige les prix et décrémente les stocks.
  * @param {{mode_paiement: import('./types.js').ModePaiement,
- *          lignes: Array<{produit: number, quantite: number}>,
+ *          lignes: Array<{produit: number, conditionnement?: number|null,
+ *                         quantite: number}>,
  *          client_nom?: string}} data
+ *   `conditionnement` null/absent = mode Détail
  * @returns {Promise<import('./types.js').VenteComplete>} 201
+ *   (`total` + `moyen_paiement` du contrat, normalisés en alias d'affichage)
  * @throws {import('./client.js').ApiError} code 'stock_insuffisant' (409)
  */
-export function creerVente(data) {
-  return request('ventes/', { method: 'POST', body: data })
+export async function creerVente(data) {
+  return normComplete(await request('ventes/', { method: 'POST', body: data }))
 }
 
 /** @param {number} id @returns {Promise<import('./types.js').VenteComplete>} */

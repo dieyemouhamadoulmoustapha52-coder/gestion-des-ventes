@@ -23,7 +23,15 @@ import { useMessages } from '../context/MessagesContext.jsx'
 import { useCategories, useCreerVente, useProduitsGrille, useVentes30Jours } from '../hooks/queries.js'
 import { MODES_CAISSE, MODE_LABELS } from '../lib/constants.js'
 import { calculerMonnaie, filtrerProduits, topVendus } from '../lib/caisse.js'
-import { formatFcfa, toNumber } from '../lib/money.js'
+import { formatFcfa, formatNombre, toNumber } from '../lib/money.js'
+import {
+  formaterStock,
+  maxQuantiteLigne,
+  modeDetail,
+  modesActifs,
+  prixLigne,
+} from '../lib/conditionnements.js'
+import { ligneCle } from '../lib/paniers.js'
 
 /** Billets rapides proposés au caissier (FCFA). */
 const BILLETS = [500, 1000, 2000, 5000, 10000]
@@ -93,19 +101,47 @@ export default function Caisse() {
   const monnaieBloquante = monnaie.statut === 'insuffisant'
   const voirMonnaie = mode === 'ESPECES' // le choix de paiement existe toujours ici
 
+  // Unités de base déjà prises par les AUTRES lignes du même produit.
+  const besoinProduit = (produitId, saufCle = null) =>
+    cart.items.reduce(
+      (s, i) =>
+        i.produit.id === produitId && i.cle !== saufCle
+          ? s + i.quantite * Math.max(1, i.conditionnement?.facteur ?? 1)
+          : s,
+      0,
+    )
+
   const addToCart = (p) => {
-    if (p.stock <= 0) {
-      toast.error(`« ${p.nom} » est en rupture.`)
-      return
-    }
-    const current = cart.items.find((i) => i.produit.id === p.id)?.quantite ?? 0
-    if (current + 1 > p.stock) {
-      toast.error(`Stock insuffisant pour ${p.nom} (disponible : ${p.stock}).`)
+    const dispo = maxQuantiteLigne(1, p.quantite, besoinProduit(p.id))
+    if (dispo < 1) {
+      toast.error(
+        p.quantite <= 0
+          ? `« ${p.nom} » est en rupture.`
+          : `Stock insuffisant pour ${p.nom} (disponible : ${formaterStock(p.quantite, p.conditionnements)}).`,
+      )
       return
     }
     setLineError(null)
-    cart.add(p)
+    cart.add(p, modeDetail(p)) // ajout par défaut au Détail (mode choisissable ensuite)
   }
+
+  // Option de la liste déroulante : clé de ligne ↔ mode du produit.
+  const modesDeLigne = (produit, cle) => {
+    const liste = modesActifs(produit).map((m) => ({ cle: ligneCle(produit.id, m), mode: m }))
+    if (!liste.some((o) => o.cle === cle)) {
+      const retire = (produit.conditionnements ?? []).find(
+        (m) => ligneCle(produit.id, m) === cle,
+      )
+      if (retire) liste.unshift({ cle, mode: retire }) // mode devenu inactif : on le montre
+    }
+    return liste
+  }
+  const modeParCle = (produit, cle) =>
+    (produit.conditionnements ?? []).find((m) => ligneCle(produit.id, m) === cle) ?? null
+  const libelleOption = (m) =>
+    m?.est_detail || Number(m?.facteur) === 1
+      ? `Détail · ${formatNombre(m?.prix_vente ?? 0)}`
+      : `${m.libelle} ×${m.facteur} · ${formatNombre(m.prix_vente)}`
 
   const validate = () => {
     if (cart.items.length === 0 || creer.isPending || monnaieBloquante) return
@@ -114,7 +150,11 @@ export default function Caisse() {
     creer.mutate(
       {
         mode_paiement: mode,
-        lignes: cart.items.map((i) => ({ produit: i.produit.id, quantite: i.quantite })),
+        lignes: cart.items.map((i) => ({
+          produit: i.produit.id,
+          conditionnement: i.conditionnement?.id ?? null, // null = Détail
+          quantite: i.quantite,
+        })),
       },
       {
         onSuccess: (vente) => {
@@ -131,7 +171,10 @@ export default function Caisse() {
         },
         onError: (err) => {
           if (isStockError(err) && err.payload) {
-            setLineError({ produit: err.payload.produit, stock_disponible: err.payload.stock_disponible })
+            setLineError({
+              produit: err.payload.produit,
+              disponible: err.payload.disponible_base, // unités de base (contrat)
+            })
             toast.error('Stock insuffisant — corrigez la ligne concernée.')
           } else if (err.fields?.lignes) {
             toast.error(err.fields.lignes[0])
@@ -363,12 +406,13 @@ export default function Caisse() {
                       {rupture ? (
                         <Badge tone="red">Rupture</Badge>
                       ) : p.est_en_alerte ? (
-                        <Badge tone="orange">{p.stock} restant{p.stock > 1 ? 's' : ''}</Badge>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">{p.stock} en stock</span>
-                      )}
+                        <Badge tone="orange">Stock bas</Badge>
+                      ) : null}
                     </div>
                     <span className="line-clamp-2 text-sm font-medium text-slate-900">{p.nom}</span>
+                    <span className="line-clamp-1 text-[11px] text-slate-500">
+                      {formaterStock(p.quantite, p.conditionnements)}
+                    </span>
                     <span className="text-sm font-bold text-[var(--primary-ink)]">
                       {formatFcfa(p.prix_unitaire)}
                     </span>
@@ -458,51 +502,79 @@ export default function Caisse() {
               ) : (
                 cart.items.map((item) => {
                   const erreur = lineError && lineError.produit === item.produit.id
+                  const facteur = Math.max(1, item.conditionnement?.facteur ?? 1)
+                  const besoinAutres = besoinProduit(item.produit.id, item.cle)
+                  const maxLigne = maxQuantiteLigne(facteur, item.produit.quantite, besoinAutres)
+                  const totalLigne =
+                    prixLigne(item.produit, item.conditionnement) * item.quantite
                   return (
-                    <div key={item.produit.id} className="space-y-1.5 px-4 py-3">
+                    <div key={item.cle} className="space-y-1.5 px-4 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <p className="truncate text-sm font-medium text-slate-900">
                           {item.produit.nom}
                         </p>
                         <p className="whitespace-nowrap text-sm font-semibold text-slate-900">
-                          {formatFcfa(item.produit.prix_unitaire * item.quantite)}
+                          {formatFcfa(totalLigne)}
                         </p>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 flex-1 items-center gap-1">
+                          <label className="sr-only" htmlFor={`mode-${item.cle}`}>
+                            Mode de vente de {item.produit.nom}
+                          </label>
+                          <select
+                            id={`mode-${item.cle}`}
+                            value={item.cle}
+                            onChange={(e) =>
+                              cart.changerMode(item.cle, modeParCle(item.produit, e.target.value))
+                            }
+                            className="h-11 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900"
+                          >
+                            {modesDeLigne(item.produit, item.cle).map((o) => (
+                              <option key={o.cle} value={o.cle}>
+                                {libelleOption(o.mode)}
+                              </option>
+                            ))}
+                          </select>
                           <button
                             type="button"
-                            onClick={() => cart.dec(item.produit.id)}
+                            onClick={() => cart.dec(item.cle)}
                             aria-label={`Retirer une unité de ${item.produit.nom}`}
-                            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50"
                           >
                             <Minus size={14} aria-hidden="true" />
                           </button>
-                          <span className="w-8 text-center text-sm font-bold" aria-live="polite">
+                          <span className="w-8 shrink-0 text-center text-sm font-bold" aria-live="polite">
                             {item.quantite}
                           </span>
                           <button
                             type="button"
-                            onClick={() => cart.inc(item.produit.id)}
-                            disabled={item.quantite >= item.produit.stock}
+                            onClick={() => cart.inc(item.cle)}
+                            disabled={item.quantite >= maxLigne}
                             aria-label={`Ajouter une unité de ${item.produit.nom}`}
-                            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
                           >
                             <Plus size={14} aria-hidden="true" />
                           </button>
                         </div>
                         <button
                           type="button"
-                          onClick={() => cart.remove(item.produit.id)}
+                          onClick={() => cart.remove(item.cle)}
                           aria-label={`Supprimer ${item.produit.nom} du panier`}
-                          className="flex h-11 w-11 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
                         >
                           <Trash2 size={16} aria-hidden="true" />
                         </button>
                       </div>
+                      <p className="text-xs text-slate-500">
+                        {facteur > 1
+                          ? `= ${item.quantite * facteur} unités de base · ${item.produit.unite_base}`
+                          : `Détail · 1 ${item.produit.unite_base ?? 'unité'}`}
+                      </p>
                       {erreur ? (
                         <p className="text-xs font-medium text-red-600" role="alert">
-                          Stock insuffisant — disponible : {lineError.stock_disponible}
+                          Stock insuffisant — disponible :{' '}
+                          {formaterStock(lineError.disponible, item.produit.conditionnements)}
                         </p>
                       ) : null}
                     </div>
