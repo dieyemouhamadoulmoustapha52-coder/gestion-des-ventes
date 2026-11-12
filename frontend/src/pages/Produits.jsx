@@ -19,6 +19,7 @@ import Skeleton from '../components/Skeleton.jsx'
 import { useToast } from '../components/Toast.jsx'
 import { useCategories, useDeleteProduit, useProduits, useReapprovisionnerProduit } from '../hooks/queries.js'
 import { formatFcfa } from '../lib/money.js'
+import { formaterStock, modesActifs } from '../lib/conditionnements.js'
 import { useDebouncedValue } from '../lib/useDebounce.js'
 
 const PAGE_SIZE = 10 // convention de pagination DRF (docs/API_CONTRACT.md)
@@ -26,7 +27,7 @@ const PAGE_SIZE = 10 // convention de pagination DRF (docs/API_CONTRACT.md)
 function RowSkeleton() {
   return (
     <tr>
-      <td className="px-4 py-3" colSpan={7}>
+      <td className="px-4 py-3" colSpan={8}>
         <Skeleton className="h-6 w-full" />
       </td>
     </tr>
@@ -254,30 +255,59 @@ export default function Produits() {
                     <th scope="col" className="px-4 py-3">Code</th>
                     <th scope="col" className="px-4 py-3">Nom</th>
                     <th scope="col" className="px-4 py-3">Catégorie</th>
-                    <th scope="col" className="px-4 py-3">Prix</th>
+                    <th scope="col" className="px-4 py-3">Prix détail</th>
+                    <th scope="col" className="px-4 py-3">Modes de vente</th>
                     <th scope="col" className="px-4 py-3">Stock</th>
                     <th scope="col" className="px-4 py-3">Seuil</th>
                     <th scope="col" className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {produits.data.results.map((p) => (
+                  {produits.data.results.map((p) => {
+                    const modesVente = modesActifs(p).filter((m) => m.facteur > 1)
+                    return (
                     <tr key={p.id} className="transition-colors duration-200 ease-in-out">
                       <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.code}</td>
                       <td className="px-4 py-3 font-medium text-slate-900">{p.nom}</td>
                       <td className="px-4 py-3 text-slate-600">{p.categorie_nom}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-900">
-                        {formatFcfa(p.prix_unitaire)}
+                        <span className="font-semibold">{formatFcfa(p.prix)}</span>
+                        <span className="ml-1 text-xs font-normal text-slate-500">/ détail</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {modesVente.length === 0 ? (
+                          <span className="text-xs text-slate-400">Détail uniquement</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            {modesVente.map((m) => (
+                              <span
+                                key={m.id ?? m.libelle}
+                                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600"
+                              >
+                                {m.libelle}
+                                <span className="font-semibold text-slate-900">×{m.facteur}</span>
+                                <span className="text-slate-500">{formatFcfa(m.prix_vente)}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-900">{p.stock}</span>
-                          {p.stock === 0 ? (
+                          <span className="font-semibold text-slate-900">
+                            {formaterStock(p.quantite, p.conditionnements)}
+                          </span>
+                          {p.quantite === 0 ? (
                             <Badge tone="red">Rupture</Badge>
                           ) : p.est_en_alerte ? (
                             <Badge tone="orange">Stock bas</Badge>
                           ) : null}
                         </div>
+                        {modesVente.length > 0 ? (
+                          <div className="text-xs text-slate-500">
+                            {p.quantite} unité{p.quantite > 1 ? 's' : ''} de base
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3 text-slate-600">{p.seuil_alerte}</td>
                       <td className="px-4 py-3">
@@ -309,7 +339,8 @@ export default function Produits() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
