@@ -204,3 +204,28 @@ describe('paniersReducer — modes de vente', () => {
     expect(s.paniers[0].items[0].conditionnement).toBeNull()
   })
 })
+
+describe('paniersReducer — produits_mis_a_jour', () => {
+  it('stocks met à jour les snapshots de TOUS les paniers', () => {
+    const p = { id: 1, stock: 30, prix_unitaire: 100, nom: 'P1' }
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p })
+    s = paniersReducer(s, { type: 'ajouter' })
+    s = paniersReducer(s, { type: 'add', produit: p })
+    s = paniersReducer(s, {
+      type: 'stocks',
+      majs: [{ id: 1, quantite: 6 }],
+    })
+    expect(s.paniers[0].items[0].produit.quantite).toBe(6)
+    expect(s.paniers[0].items[0].produit.stock).toBe(6)
+    expect(s.paniers[1].items[0].produit.stock).toBe(6)
+  })
+
+  it('stocks sans correspondance → state inchangé', () => {
+    const p = { id: 1, stock: 30, prix_unitaire: 100, nom: 'P1' }
+    let s = vide()
+    s = paniersReducer(s, { type: 'add', produit: p })
+    expect(paniersReducer(s, { type: 'stocks', majs: [] })).toBe(s)
+    expect(paniersReducer(s, { type: 'stocks', majs: [{ id: 99, quantite: 0 }] })).toBe(s)
+  })
+})

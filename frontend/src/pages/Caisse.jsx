@@ -167,6 +167,10 @@ export default function Caisse() {
               : {}),
           })
           cart.vendu(panierVenduId)
+          // stock réel du serveur → snapshots des AUTRES paniers en attente
+          if (Array.isArray(vente.produits_mis_a_jour)) {
+            cart.appliquerStocks(vente.produits_mis_a_jour)
+          }
           setMontantRecu('')
         },
         onError: (err) => {
@@ -175,6 +179,15 @@ export default function Caisse() {
               produit: err.payload.produit,
               disponible: err.payload.disponible_base, // unités de base (contrat)
             })
+            // la vente n'a rien écrit : on aligne le snapshot sur le stock réel
+            if (
+              Number.isInteger(err.payload.produit) &&
+              Number.isFinite(Number(err.payload.disponible_base))
+            ) {
+              cart.appliquerStocks([
+                { id: err.payload.produit, quantite: Number(err.payload.disponible_base) },
+              ])
+            }
             toast.error('Stock insuffisant — corrigez la ligne concernée.')
           } else if (err.fields?.lignes) {
             toast.error(err.fields.lignes[0])

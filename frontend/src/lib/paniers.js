@@ -104,6 +104,7 @@ function ajouterLigne(items, produit, mode) {
  *   - add {produit, mode?} : ajoute/incrémente la ligne produit+mode (Détail si mode omis)
  *   - inc/dec/remove {cle} : opèrent sur une ligne (l'ancien `id` = ligne Détail)
  *   - mode {cle, mode} : change le mode d'une ligne (fusion si la ligne cible existe)
+ *   - stocks {majs: [{id, quantite}]} : applique produits_mis_a_jour à tous les paniers
  *   - activer {id} : bascule d'onglet (index)
  *   - ajouter : crée un panier (max PANIER_MAX) et le rend actif
  *   - fermer {id} : ferme UN panier VIDE uniquement
@@ -155,6 +156,28 @@ export function paniersReducer(state, action) {
 
     case 'mode':
       return mapActif(state, (p) => changerMode(p, action))
+
+    case 'stocks': {
+      // `produits_mis_a_jour` d'une vente : met à jour les snapshots de stock
+      // des lignes (y compris dans les autres paniers en attente).
+      const majs = new Map(
+        (action.majs ?? [])
+          .filter((m) => Number.isInteger(m?.id) && Number.isFinite(Number(m.quantite)))
+          .map((m) => [m.id, Math.max(0, Math.trunc(Number(m.quantite)))]),
+      )
+      if (majs.size === 0) return state
+      let touche = false
+      const paniers = state.paniers.map((p) => ({
+        ...p,
+        items: p.items.map((i) => {
+          const q = majs.get(i.produit.id)
+          if (q === undefined || i.produit.quantite === q) return i
+          touche = true
+          return { ...i, produit: { ...i.produit, quantite: q, stock: q } }
+        }),
+      }))
+      return touche ? { ...state, paniers } : state
+    }
 
     case 'clear':
       return typeof action.id === 'number'

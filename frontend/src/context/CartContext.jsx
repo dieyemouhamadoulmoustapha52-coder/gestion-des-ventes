@@ -10,6 +10,7 @@ import { useProduitsGrille } from '../hooks/queries.js'
 import { useMessages } from './MessagesContext.jsx'
 import {
   aDesLignes,
+  compterLignes,
   ecrireBrouillon,
   effacerBrouillon,
   lireBrouillon,
@@ -36,12 +37,15 @@ export function CartProvider({ children }) {
       const brut = lireBrouillon()
       if (!brut) return
       const etat = revaliderBrouillon(brut, produits.data.results ?? [])
+      const retires = Math.max(0, compterLignes(brut) - compterLignes(etat))
       dispatch({ type: 'hydrate', state: etat })
       if (aDesLignes(etat)) {
         notify({
           type: 'panier-restaure',
           niveau: 'info',
-          texte: 'Panier restauré',
+          texte: retires > 0
+            ? `Panier restauré — ${retires} article${retires > 1 ? 's' : ''} retiré${retires > 1 ? 's' : ''} (produit ou mode indisponible)`
+            : 'Panier restauré',
           ephemere: true,
           masquable: true,
           audience: 'caissier',
@@ -85,6 +89,8 @@ export function CartProvider({ children }) {
       remove: (cle) => dispatch({ type: 'remove', cle }),
       // Changer le mode d'une ligne (Détail ↔ Carton…) : re-borné en unités de base.
       changerMode: (cle, mode) => dispatch({ type: 'mode', cle, mode }),
+      // produits_mis_a_jour d'une vente : stock réel dans TOUS les paniers.
+      appliquerStocks: (majs) => dispatch({ type: 'stocks', majs }),
       // La vente validée ne vide QUE son panier (id = panier vendu).
       clear: (id) => dispatch({ type: 'clear', id }),
       vendu: (id) => dispatch({ type: 'vendu', id }),
