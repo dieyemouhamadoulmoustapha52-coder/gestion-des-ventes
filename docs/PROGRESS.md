@@ -1,6 +1,6 @@
 # Progression du projet — Gestion des ventes
 
-> Dernière mise à jour : 04/11/2026 · branche `feature/frontend-ui`
+> Dernière mise à jour : 12/11/2026 · branche `feature/modes-de-vente` (sur `feature/caisse-historique-pwa`)
 
 ## Fait
 
@@ -34,6 +34,30 @@
 - Avant : build Vite finalisé en production : `dist/assets/index-*.js` ≈ `97.7 Ko` gzip ; page d'accueil / caisse / produits sans dashboard ni thème personnalisé.
 - Après : build de validation produit un bundle total `~97.7 Ko gzip` sur l'écran principal (contrat & UI enrichies sans ajout de dépendance), avec `formatFcfa()` et les unités non-coupables (`FCFA`, `g`, `L`) gérées via espacement insécable et barres des 7 jours optimisées en rendu simple.
 - Hypothèse d'optimisation à valider côté backend/backend perf : aucun module externe ajouté, refetch 60 s + invalidation sur vente, route d'accueil chargée en lazy.
+
+## Modes de vente — `feature/modes-de-vente` (12/11/2026)
+
+> 10 étapes, 10 commits Conventional Commits, `npm test` + `npm run build` verts à chaque étape.
+> **MODE MOCK uniquement** : le backend Django n'a pas été modifié (périmètre intact).
+
+- [x] 1 `69aed9f` types JSDoc du contrat, fonctions pures de conditionnements (`lib/conditionnements.js`), adaptateur API
+- [x] 2 `b32738b` API mock conforme au contrat (produits + conditionnements, ventes, réappro, rapports)
+- [x] 3 `0ff3b2b` formulaire produit **inline** (sections identité / unités & prix / modes de vente)
+- [x] 4 `d35a794` colonnes produits : prix détail, badges modes, stock en toutes lettres (`formaterStock`)
+- [x] 5 `4b2e978` caisse : sélection du mode **par ligne**, bornes en unités de base, fusion/retirage de ligne
+- [x] 6 `6c6e63b` brouillon `gv:paniers:v2` + migration v1, 409 par ligne (`disponible_base`), `produits_mis_a_jour`
+- [x] 7 `6021056` ticket, WhatsApp, détail de vente et export CSV avec le mode de vente
+- [x] 8 `8523198` réapprovisionnement **en ligne** par mode de vente (modale retirée)
+- [x] 9 `c9fc24c` statistiques et rapports agrégés en **unités de base** (top produits, CA par catégorie, `valeur_stock`)
+- [x] 10 (ce commit) tests + `docs/API_CONTRACT.md` + `PROGRESS.md`
+
+**Règles métier appliquées** : UN stock par produit en unités de base ; `facteur` entier ≥ 2 sauf
+Détail (= 1) ; quantités entières ; prix/stock/libellés **figés** sur chaque ligne de vente ;
+aucune écriture avant le contrôle de stock cumulé (409 sans effet de bord).
+
+**Reste à signaler** (hors périmètre de cette branche) : `CategorieManager` et le tiroir `Drawer`
+de l'historique utilisent encore des modales (non demandés) ; le vrai backend Django reste à
+conformer à `docs/API_CONTRACT.md`.
 
 ## À faire
 
