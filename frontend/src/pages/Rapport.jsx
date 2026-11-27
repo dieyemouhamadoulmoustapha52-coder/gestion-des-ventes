@@ -1,19 +1,21 @@
 /**
- * Rapport du jour : sélecteur de date, cartes d'indicateurs,
- * répartitions (barres CSS, part en % à 1 décimale), top 3, produits à racheter.
+ * Rapport du jour : sélecteur de date, rangée d'indicateurs toujours
+ * visible (CA, ventes, panier moyen, bénéfice), puis détail en onglets.
+ * @audience patron
  */
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Banknote, CalendarDays, Receipt, ShoppingBasket } from 'lucide-react'
+import { AlertTriangle, Banknote, CalendarDays, Percent, Receipt, ShoppingBasket } from 'lucide-react'
 import Badge from '../components/Badge.jsx'
 import Button from '../components/Button.jsx'
 import EmptyState from '../components/EmptyState.jsx'
 import ErrorState from '../components/ErrorState.jsx'
 import RapportMensuel from '../components/RapportMensuel.jsx'
 import Skeleton from '../components/Skeleton.jsx'
-import { useRapport } from '../hooks/queries.js'
+import { useRapport, useVentesJour } from '../hooks/queries.js'
 import { MODE_LABELS } from '../lib/constants.js'
 import { isoDateDakar } from '../lib/dates.js'
 import { formatFcfa } from '../lib/money.js'
+import { beneficePeriode } from '../lib/rapport.js'
 
 const toISODate = (d) => isoDateDakar(d)
 
@@ -65,6 +67,11 @@ export default function Rapport() {
   const rapport = useRapport(date)
   const data = rapport.data
 
+  // Marge brute du jour : undefined = en cours de calcul,
+  // null = non calculable → la carte Bénéfice est omise (jamais un zéro).
+  const ventesJour = useVentesJour(date)
+  const benefice = ventesJour.data ? beneficePeriode(ventesJour.data, [date, date]) : undefined
+
   const isToday = date === toISODate(new Date())
   const emptyDay = data && data.nb_ventes === 0
 
@@ -106,20 +113,25 @@ export default function Rapport() {
         <ErrorState message={rapport.error.detail} onRetry={() => rapport.refetch()} />
       ) : rapport.isPending ? (
         <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 items-start gap-3 xl:grid-cols-4">
+            <Skeleton className="h-28" />
             <Skeleton className="h-28" />
             <Skeleton className="h-28" />
             <Skeleton className="h-28" />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid items-start gap-4 md:grid-cols-2">
             <Skeleton className="h-56" />
             <Skeleton className="h-56" />
           </div>
         </div>
       ) : data ? (
         <>
-          {/* Cartes indicateurs */}
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* Rangée d'indicateurs — TOUJOURS visible, au-dessus des onglets */}
+          <div
+            className={`grid grid-cols-2 items-start gap-3 ${
+              benefice === null ? 'xl:grid-cols-3' : 'xl:grid-cols-4'
+            }`}
+          >
             <StatCard
               icon={Banknote}
               label="Chiffre d'affaires"
@@ -138,10 +150,20 @@ export default function Rapport() {
               value={formatFcfa(data.panier_moyen)}
               hint="CA / nombre de ventes"
             />
+            {benefice === undefined ? (
+              <Skeleton className="h-28" />
+            ) : benefice === null ? null : (
+              <StatCard
+                icon={Percent}
+                label="Bénéfice"
+                value={formatFcfa(benefice)}
+                hint="Marge brute du jour"
+              />
+            )}
           </div>
 
           {/* Répartitions */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid items-start gap-4 md:grid-cols-2">
             <section
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               aria-labelledby="t-modes"
@@ -193,7 +215,7 @@ export default function Rapport() {
           </div>
 
           {/* Top 3 + alertes */}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid items-start gap-4 md:grid-cols-2">
             <section
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               aria-labelledby="t-top"

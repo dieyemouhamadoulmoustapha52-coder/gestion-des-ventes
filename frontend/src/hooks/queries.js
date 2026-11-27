@@ -129,6 +129,22 @@ export function useRapport(date) {
 }
 
 /**
+ * Ventes D'UNE journée AVEC leurs lignes — bénéfice (marge brute) et
+ * top produits du jour, calculés côté client sans contrat d'API nouveau.
+ * @audience patron
+ * @param {string} date 'YYYY-MM-DD'
+ * @returns {import('@tanstack/react-query').UseQueryResult<import('../api/types.js').VenteComplete[]>}
+ */
+export function useVentesJour(date) {
+  return useQuery({
+    queryKey: ['ventes', 'jour', date, 'lignes'],
+    queryFn: () => listVentesDetaillees({ date }),
+    staleTime: 120_000,
+    enabled: Boolean(date),
+  })
+}
+
+/**
  * Tableau de bord (page d'accueil) — UN SEUL appel, rafraîchi toutes les 60 s.
  * @param {string} [date] 'YYYY-MM-DD' — défaut serveur : aujourd'hui (Africa/Dakar)
  * @returns {import('@tanstack/react-query').UseQueryResult<import('../api/types.js').TableauDeBord>}
