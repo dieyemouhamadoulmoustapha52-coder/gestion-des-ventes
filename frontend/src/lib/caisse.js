@@ -36,7 +36,30 @@ export function calculerMonnaie(total, recu) {
 export function filtrerProduits(produits, terme) {
   const q = normalize(terme)
   if (!q) return []
-  return (produits ?? []).filter((p) => normalize(p.nom).includes(q) || (p.code && normalize(p.code).includes(q)))
+  return (produits ?? []).filter(
+    (p) =>
+      normalize(p.nom).includes(q) ||
+      (p.code && normalize(p.code).includes(q)) ||
+      // code de mode : « COLA12 » remonte le produit (ajout de 1 carton via Entrée)
+      (p.conditionnements ?? []).some((m) => m?.code && normalize(m.code).includes(q)),
+  )
+}
+
+/**
+ * Saisie EXACTEMENT égale à un code de mode (« COLA12 », « cola6 »…) →
+ * le produit + le mode à ajouter. Saisie insensible à la casse/espaces.
+ * @param {Array<any>} produits jeu visible (filtre catégorie déjà appliqué)
+ * @param {string} terme texte saisi dans la recherche
+ * @returns {{produit: any, mode: any}|null}
+ */
+export function resoudreCodeMode(produits, terme) {
+  const q = normalize(String(terme ?? '').trim())
+  if (!q) return null
+  for (const p of produits ?? []) {
+    const mode = (p.conditionnements ?? []).find((m) => m?.code && normalize(m.code) === q)
+    if (mode) return { produit: p, mode }
+  }
+  return null
 }
 
 function normalize(s) {

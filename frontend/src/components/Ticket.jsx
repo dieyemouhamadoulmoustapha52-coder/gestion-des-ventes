@@ -79,15 +79,19 @@ export default function Ticket({ vente, boutique = {}, onFermer }) {
               <div key={l.id} className="ticket-ligne">
                 <p className="ticket-ligne-nom">{l.produit_nom}</p>
                 <div className="ticket-ligne-meta">
+                  {/* mode → « 2 × Carton (12) », détail → « 3 × 1 500 » */}
                   <span>
-                    {l.quantite} × {formatFcfa(l.prix_unitaire)}
+                    {mode
+                      ? `${l.quantite} × ${mode}`
+                      : `${l.quantite} × ${formatFcfa(l.prix_unitaire)}`}
                   </span>
                   <span>{formatFcfa(l.montant_ligne)}</span>
                 </div>
                 {mode && base > 0 ? (
                   <div className="ticket-ligne-meta">
                     <span>
-                      {mode} — {base} unité{base > 1 ? 's' : ''}
+                      {formatFcfa(l.prix_unitaire)} / {mode} · {base} unité
+                      {base > 1 ? 's' : ''}
                     </span>
                     <span aria-hidden="true" />
                   </div>

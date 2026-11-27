@@ -563,15 +563,23 @@ describe('rapports — agrégation en unités de base', () => {
     expect(ca(apres.body) - ca(avant.body)).toBe(30000)
   })
 
-  it('valeur_stock = prix de vente × stock en unités de base', async () => {
-    const valeur = (r) => Number(r.stock.valeur_stock)
+  it("valeur_stock = prix d'achat × stock (stock immobilisé au coût)", async () => {
+    const attendu = () =>
+      Number(
+        db.money(db.state.produits.reduce((s, p) => s + p.prix_achat * p.quantite, 0)),
+      )
     const avant = await appel('GET', TABLEAU, {})
+    expect(Number(avant.body.stock.valeur_stock)).toBe(attendu())
     await appel('POST', VENTES, {
       body: { mode_paiement: 'ESPECES', lignes: [{ produit: 10, conditionnement: 3, quantite: 2 }] },
     })
     const apres = await appel('GET', TABLEAU, {})
-    // −24 unités × 1 500 (prix de vente détail)
-    expect(valeur(apres.body) - valeur(avant.body)).toBe(-24 * 1500)
+    expect(Number(apres.body.stock.valeur_stock)).toBe(attendu())
+    // −24 unités × 1 083,33 (prix d'achat), et non × 1 500 (prix de vente)
+    expect(Number(avant.body.stock.valeur_stock) - Number(apres.body.stock.valeur_stock)).toBeCloseTo(
+      24 * 1083.33,
+      1,
+    )
   })
 
   it('produits_a_racheter exprime le stock en unités de base', async () => {

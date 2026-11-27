@@ -144,8 +144,9 @@ Objet produit (GET / POST / PUT / PATCH / réappro) :
     (une vente de 2 cartons ×12 compte pour 24), triées décroissant, **max 5**.
   - `stock` = état **instantané** : `nb_produits` = produits au catalogue ;
     `nb_en_alerte` = produits avec `est_en_alerte` (**ruptures incluses**), `nb_en_rupture` = `quantite === 0`
-    (sous-ensemble) ; `valeur_stock` = Σ `prix × quantite` = **prix de vente (Détail) × stock en
-    unités de base** (chaîne décimale).
+    (sous-ensemble) ; `valeur_stock` = Σ `prix_achat × quantite` = **stock immobilisé au
+    COÛT D'ACHAT × unités de base** (chaîne décimale) — jamais au prix de vente, qui
+    surestimerait la trésorerie immobilisée. L'écran l'affiche avec cette précision.
   - `dernieres_ventes` = **5 dernières ventes globales** (tri `-date_vente`),
     **indépendantes du paramètre `date`**, forme exacte ci-dessus (**sans** `client_nom`).
   - montants (`ca`, `panier_moyen`, `valeur_stock`, `montant_total`) en **chaînes décimales** ;
@@ -173,6 +174,26 @@ Objet produit (GET / POST / PUT / PATCH / réappro) :
 ```
 
 - Non trouvé **404** : `{"detail": "…"}` ; conflit PROTECT **409** : `{"detail": "…"}`.
+
+## État de l'API réelle (constat du 12/11/2026)
+
+Source : `backend/commerce/serializers.py`, `backend/commerce/models.py`,
+`backend/commerce/views.py`, `backend/services/rapports.py` (jamais modifiés par
+le front). Le front lit **les deux formes** (contrat d'abord, réel en repli —
+`src/api/adaptateur.js`) ; l'**envoi** part en noms de contrat : il faudra donc
+migrer le backend, sinon les POST échoueront.
+
+| Ressource | Le front ENVOIE (contrat) | L'API RÉELLE lit/écrit aujourd'hui | À faire côté backend |
+|---|---|---|---|
+| `produits/` | `prix`, `quantite`, `seuil_alerte` | `prix_unitaire`, `stock`, `seuil_alerte` | renommer ou accepter les deux |
+| `produits/` | `prix_achat`, `unite_base`, `conditionnements[]` | **absents du modèle** | ajouter `prix_achat`, `unite_base`, table `conditionnements` (libellé, facteur, prix_vente, code, actif) |
+| `produits/?reappro` | `{quantite}` **× facteur du mode** (unités de base) | `{quantite}` unité simple | × facteur côté serveur ou front inchangé + docs |
+| `ventes/` (POST) | `total`, `moyen_paiement`, `lignes[{produit, conditionnement, quantite}]` | `montant_total`, `mode_paiement`, `lignes[{produit, quantite}]` | renommer + champ `conditionnement` sur la ligne |
+| `ventes/` (GET) | lit `total`/`moyen_paiement` (repli `montant_total`/`mode_paiement`) | `montant_total`, `mode_paiement` | renommer |
+| `rapports/tableau-de-bord/` | `valeur_stock` = Σ `prix_achat × quantite` | `Σ prix_unitaire × stock` (`services/rapports.py`) | passer sur `prix_achat` (champ à créer) |
+
+Checklist backend : **avant** de brancher le vrai serveur, aligner les noms ci-dessus
+(le front retirera alors les alias `@alias` de `src/api/adaptateur.js`).
 
 ## Checklist d'intégration (avant de brancher le vrai backend)
 

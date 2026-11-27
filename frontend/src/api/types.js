@@ -153,7 +153,7 @@
  * @property {number} nb_produits
  * @property {number} nb_en_alerte produits avec est_en_alerte (ruptures incluses)
  * @property {number} nb_en_rupture stock === 0 (sous-ensemble)
- * @property {number} valeur_stock Σ prix × stock, normalisé
+ * @property {number} valeur_stock Σ prix_achat × quantite (stock immobilisé au coût), normalisé
  */
 
 /**

@@ -58,22 +58,22 @@ describe('calculs de base', () => {
 
 describe('formaterStock', () => {
   it('« 30 · 2 cartons + 6 unités » de l’exemple de référence', () => {
-    expect(formaterStock(30, [detail, demi, carton])).toBe('2 cartons + 6 unités')
+    expect(formaterStock(30, [detail, demi, carton])).toBe('30 · 2 cartons + 6 unités')
   })
 
   it('stock exactement divisible → pas de reste', () => {
-    expect(formaterStock(24, [detail, carton])).toBe('2 cartons')
+    expect(formaterStock(24, [detail, carton])).toBe('24 · 2 cartons')
   })
 
   it('singulier quand la quantité vaut 1', () => {
-    expect(formaterStock(18, [detail, carton])).toBe('1 carton + 6 unités')
+    expect(formaterStock(18, [detail, carton])).toBe('18 · 1 carton + 6 unités')
   })
 
   it('choisit le plus gros mode vendable (reste exprimé en unités)', () => {
     // 66 = 5 × 12 + 6 (aperçu du réapprovisionnement de l’énoncé)
-    expect(formaterStock(66, [detail, demi, carton])).toBe('5 cartons + 6 unités')
+    expect(formaterStock(66, [detail, demi, carton])).toBe('66 · 5 cartons + 6 unités')
     // 6 < carton → le demi-carton (×6) devient le plus gros mode vendable
-    expect(formaterStock(6, [detail, demi, carton])).toBe('1 demi-carton')
+    expect(formaterStock(6, [detail, demi, carton])).toBe('6 · 1 demi-carton')
   })
 
   it('sans mode (facteur ≥ 2) → unités seules', () => {

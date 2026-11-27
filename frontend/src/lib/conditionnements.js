@@ -232,8 +232,9 @@ export function disponibleEnMode(stock, facteur) {
 }
 
 /**
- * Stock en toutes lettres : le plus gros mode vendable + le reste en unités.
- * `formaterStock(30, [Carton ×12])` → « 2 cartons + 6 unités ».
+ * Stock en toutes lettres : total en unités de base, puis le plus gros mode
+ * vendable + le reste. `formaterStock(30, [Carton ×12])` → « 30 · 2 cartons +
+ * 6 unités » ; sans mode vendable → « 6 unités » (pas de préfixe redondant).
  * @param {number} stock unités de base
  * @param {Array<Partial<Conditionnement>>} conditionnements
  * @returns {string} pluriel simple, jamais vide
@@ -251,7 +252,7 @@ export function formaterStock(stock, conditionnements) {
     const reste = s % facteur
     const parties = [`${q} ${pluriel(mode.libelle, q)}`]
     if (reste > 0) parties.push(unites(reste))
-    return parties.join(' + ')
+    return `${s} · ${parties.join(' + ')}`
   }
   return unites(s)
 }

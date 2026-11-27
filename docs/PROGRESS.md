@@ -55,13 +55,28 @@
 Détail (= 1) ; quantités entières ; prix/stock/libellés **figés** sur chaque ligne de vente ;
 aucune écriture avant le contrôle de stock cumulé (409 sans effet de bord).
 
-**Reste à signaler** (hors périmètre de cette branche) : `CategorieManager` et le tiroir `Drawer`
-de l'historique utilisent encore des modales (non demandés) ; le vrai backend Django reste à
-conformer à `docs/API_CONTRACT.md`.
+**Corrections post-revue (12/11/2026, commit suivant)** :
+- `valeur_stock` = **Σ `prix_achat × quantite`** (stock immobilisé au coût, plus au prix de
+  vente) — mock, JSDoc, carte Accueil (`Au coût d'achat · …`) et tests ;
+- `formaterStock` préfixe le total : `30 · 2 cartons + 6 unités` ;
+- caisse : un **code de mode** saisi (`COLA12` + Entrée) ajoute directement 1 carton
+  (`resoudreCodeMode`, la recherche rapide matche aussi les codes de mode) ;
+- ticket : ligne de mode = `2 × Carton (12)` / `15 000 / Carton (12) · 24 unités` / `30 000` ;
+- formulaire produit : colonne **Marge / remise** par mode (`margeMode`, `remiseVsDetail`) ;
+- `src/api/adaptateur.js` et `docs/API_CONTRACT.md` décrivent l'**API réelle constatée**
+  (`prix_unitaire`, `stock`, `montant_total`, `mode_paiement`, `montant_ligne`, aucun
+  `conditionnement`) : le front lit les deux formes, l'envoi reste en noms de contrat.
+
+**Reste à signaler** : le vrai backend Django reste à conformer à `docs/API_CONTRACT.md`
+(tableau « État de l'API réelle »).
 
 ## À faire
 
-- [ ] Backend Django : projet + API conformes à `docs/API_CONTRACT.md` (voir checklist d'intégration)
+- [ ] **Prochain lot — dernières modales** : `CategorieManager` (catégories) et le tiroir
+  `Drawer` (détail de vente) en panneaux en ligne, comme le formulaire produit et la réappro
+- [ ] Backend Django : projet + API conformes à `docs/API_CONTRACT.md` (voir checklist
+  d'intégration **et** le tableau « État de l'API réelle » : renommages + table
+  `conditionnements` + `prix_achat`)
 - [ ] Brancher le frontend au vrai backend (`VITE_USE_MOCK=false`, backend sur :8000)
 - [ ] Revue de PR `feature/frontend-ui` puis merge dans `main`
 

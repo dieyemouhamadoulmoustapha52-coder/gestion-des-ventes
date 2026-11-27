@@ -136,7 +136,15 @@ export default function Layout() {
 
       <main className="lg:pl-64">
         <MessageBar />
-        <div className="mx-auto max-w-6xl px-4 py-6 pb-28 lg:pb-10">
+        {/* Conteneur de page : 1152 px par défaut, 1400 px pour le Rapport
+            (indicateurs + onglets sur 3 colonnes) — centré, marges fluides. */}
+        <div
+          className={`mx-auto py-6 pb-28 lg:pb-10 ${
+            location.pathname.startsWith('/rapport')
+              ? 'max-w-[1400px] px-4 sm:px-6'
+              : 'max-w-6xl px-4'
+          }`}
+        >
           <DemoBanner />
           <ScreenErrorBoundary resetKey={location.pathname}>
             <Suspense fallback={<PageSkeleton />}>
